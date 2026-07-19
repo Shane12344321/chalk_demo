@@ -37,7 +37,7 @@ export const SERVER_EVENTS = {
 } as const;
 
 export const SESSION_TOKEN_BUDGET = 50_000;
-export const MAX_RESPONSE_OUTPUT_TOKENS = 256;
+export const MAX_RESPONSE_OUTPUT_TOKENS = 1_024;
 
 export const COST_CONTROL_CONFIGURATION = {
   type: "retention_ratio",
@@ -153,6 +153,26 @@ export const ANNOTATE_TOOL = {
   },
 } as const;
 
+export const DRAW_SCRATCH_TOOL = {
+  type: "function",
+  name: "draw_scratch",
+  description:
+    "Draw one small standalone sketch on a disposable floating side card when the student asks to see something new that is not about the existing board. The lesson board is untouched and the lesson can still resume afterward.",
+  parameters: {
+    type: "object",
+    properties: {
+      description: {
+        type: "string",
+        minLength: 3,
+        maxLength: 200,
+        description: "A concise description of the single visual the student asked to see.",
+      },
+    },
+    required: ["description"],
+    additionalProperties: false,
+  },
+} as const;
+
 const QA_MARK_SIDE = {
   type: "string",
   enum: ["above", "below", "left", "right"],
@@ -229,6 +249,7 @@ When the student interrupts, the board freezes. Answer the question in at most t
 After an interruption answer, say that the student can use Resume when ready. Do not claim to see an element unless it appears in the visible-board context. When referring to a visible element, call one local pointing or emphasis tool with its exact ID. Call annotate only when the answer truly needs new explanatory ink; prefer local pointing for emphasis.
 When the student asks to begin a new math or physics topic and no lesson is running, call teach once with a concise topic and relevant prior knowledge.
 If the student has interrupted the lesson and clearly asks to learn a different topic instead, acknowledge briefly and call teach once with the new topic; the board starts fresh. If teach reports the lesson is busy, explain the current lesson must finish loading first.
+If the student asks to see a new standalone visual that is not about the existing board and is not a full new topic, call draw_scratch once with a concise description; it appears on a separate side card, the lesson board is untouched, and the student can still Resume afterward. Prefer pointing or annotate for questions about ink already on the board.
 Be conversational and Socratic. Never mention internal event names, credentials, tools, loading, prompts, or diagnostics.`;
 
 export const DIAGNOSTIC_TUTOR_ADDENDUM = `
@@ -320,6 +341,7 @@ export function createSessionUpdate(
     ...DEIXIS_TOOLS,
     ...(attentionChoreography ? ATTENTION_CHOREOGRAPHY_TOOLS : []),
     ...(qaDirectDraw ? [DRAW_QA_ANNOTATION_TOOL] : []),
+    DRAW_SCRATCH_TOOL,
     ANNOTATE_TOOL,
   ];
   const tools = mode === "diagnostics"
@@ -375,8 +397,8 @@ export function createTutorContextUpdate(
       ),
       tools:
         mode === "diagnostics"
-          ? [TEACH_TOOL, ...DEIXIS_TOOLS, ...attentionTools, ...(qaDirectDraw ? [DRAW_QA_ANNOTATION_TOOL] : []), ANNOTATE_TOOL, DEBUG_ECHO_TOOL]
-          : [TEACH_TOOL, ...DEIXIS_TOOLS, ...attentionTools, ...(qaDirectDraw ? [DRAW_QA_ANNOTATION_TOOL] : []), ANNOTATE_TOOL],
+          ? [TEACH_TOOL, ...DEIXIS_TOOLS, ...attentionTools, ...(qaDirectDraw ? [DRAW_QA_ANNOTATION_TOOL] : []), DRAW_SCRATCH_TOOL, ANNOTATE_TOOL, DEBUG_ECHO_TOOL]
+          : [TEACH_TOOL, ...DEIXIS_TOOLS, ...attentionTools, ...(qaDirectDraw ? [DRAW_QA_ANNOTATION_TOOL] : []), DRAW_SCRATCH_TOOL, ANNOTATE_TOOL],
       tool_choice: "auto",
     },
   } as const;
@@ -393,6 +415,14 @@ export function createFunctionCallOutput(callId: string, output: unknown) {
   } as const;
 }
 
+/**
+ * Post-tool continuations are short bridging remarks, never lectures. The
+ * response-level cap enforces brevity structurally: an uncapped framing
+ * response has been observed talking through the entire lesson buffer and
+ * starving narration of its playback window.
+ */
+export const MAX_TOOL_CONTINUATION_OUTPUT_TOKENS = 120;
+
 export function createResponseAfterTool(
   eventId?: string,
   metadata?: Readonly<Record<string, string>>,
@@ -403,6 +433,7 @@ export function createResponseAfterTool(
     ...(eventId ? { event_id: eventId } : {}),
     response: {
       output_modalities: ["audio"],
+      max_output_tokens: MAX_TOOL_CONTINUATION_OUTPUT_TOKENS,
       ...(metadata ? { metadata } : {}),
       ...(instructions ? { instructions } : {}),
     },

@@ -10,6 +10,8 @@ export type {
   PerceivedAudioStop,
   RealtimeSemanticEvent,
   RealtimeSnapshot,
+  ResponseDiagnostic,
+  ResponseDiagnosticStage,
   SyncMode,
   TraceEntry,
   TraceExportContext,

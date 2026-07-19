@@ -89,6 +89,34 @@ export interface InterruptionMarker {
   stale_output_events: number;
 }
 
+export type ResponseDiagnosticStage =
+  | "registered"
+  | "created"
+  | "audio_started"
+  | "generation_done"
+  | "playback_stopped"
+  | "settled"
+  | "failed"
+  | "timed_out";
+
+/** Content-free response ledger used to explain voice stalls in diagnostics mode. */
+export interface ResponseDiagnostic {
+  key: string;
+  purpose: string;
+  request_id?: string;
+  step_id?: string;
+  cycle?: number;
+  response_id?: string;
+  registered_at_ms: number;
+  created_at_ms?: number;
+  audio_started_at_ms?: number;
+  generation_done_at_ms?: number;
+  playback_stopped_at_ms?: number;
+  terminal_at_ms?: number;
+  stage: ResponseDiagnosticStage;
+  failure_code?: string;
+}
+
 export interface RealtimeSnapshot {
   status: ConnectionStatus;
   sessionModel?: string;
@@ -102,6 +130,7 @@ export interface RealtimeSnapshot {
   lastError?: string;
   trace: TraceEntry[];
   interruptions: InterruptionMarker[];
+  responseDiagnostics: ResponseDiagnostic[];
   consecutiveSuccessfulInterruptions: number;
   toolRoundTrips: number;
   tokenUsage: TokenUsageSummary;
@@ -125,6 +154,7 @@ export interface RealtimeClientCallbacks {
     elementId: string,
   ) => { overlayId: string } | undefined;
   onAnnotateRequested?: (request: string) => { requestId: string } | undefined;
+  onDrawScratchRequested?: (description: string) => { requestId: string } | undefined;
   onDrawQaAnnotationRequested?: (
     marks: readonly import("./toolRouter").QaAnnotationMark[],
   ) =>

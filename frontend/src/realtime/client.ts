@@ -40,6 +40,8 @@ import type {
   RealtimeClientCallbacks,
   RealtimeSemanticEvent,
   RealtimeSnapshot,
+  ResponseDiagnostic,
+  ResponseDiagnosticStage,
   ServerEvent,
   SessionCredential,
   TokenUsageSummary,
@@ -58,6 +60,11 @@ const MAX_SEEN_CALL_IDS = 256;
 const SESSION_READY_TIMEOUT_MS = 15_000;
 const RESPONSE_CREATED_TIMEOUT_MS = 8_000;
 const RESPONSE_SETTLEMENT_TIMEOUT_MS = 20_000;
+// Narration ink is gated on observed audible playback. When consecutive
+// responses share one continuous WebRTC output buffer, the per-response
+// `output_audio_buffer.started` event can be missed entirely; without a
+// fallback the lesson then abandons a fully generated step at 0% ink.
+const NARRATION_AUDIO_START_FALLBACK_MS = 4_000;
 const ICE_GATHER_TIMEOUT_MS = 5_000;
 
 const EMPTY_TOKEN_USAGE: TokenUsageSummary = {
@@ -108,6 +115,7 @@ export class RealtimeClient implements BoardContextPublisher {
   private readonly responseCoordinator = new ResponseCoordinator();
   private trace: TraceEntry[] = [];
   private interruptions: InterruptionMarker[] = [];
+  private responseDiagnostics: ResponseDiagnostic[] = [];
   private seenCallIds = new Set<string>();
   private seenUsageResponseIds = new Set<string>();
   private interruptedResponseIds = new Map<string, string>();
@@ -124,6 +132,7 @@ export class RealtimeClient implements BoardContextPublisher {
   private lastAcknowledgedManifestHash?: string;
   private readonly responseCreateTimeouts = new Map<string, number>();
   private readonly responseSettlementTimeouts = new Map<string, number>();
+  private readonly narrationAudioStartFallbacks = new Map<string, number>();
   private automaticResponseCreationTimeout?: {
     timeout: number;
     purpose: "student_qa" | "checkpoint_feedback";
@@ -336,6 +345,7 @@ export class RealtimeClient implements BoardContextPublisher {
     context: NarrationContext,
   ): void {
     this.responseCoordinator.armAutomatic({ purpose, context });
+    this.recordResponseDiagnostic(`auto:${purpose}:${context.requestId}:${context.stepId}:${context.cycle}`, purpose, context);
     this.trackAutomaticResponseCreation(purpose, context);
     this.emitSnapshot();
   }
@@ -376,6 +386,7 @@ export class RealtimeClient implements BoardContextPublisher {
       context,
       clientEventId,
     });
+    this.recordResponseDiagnostic(clientEventId, purpose, context);
     try {
       this.sendEvent(
         createNarrationResponse(script, clientEventId, {
@@ -410,6 +421,7 @@ export class RealtimeClient implements BoardContextPublisher {
       lastError: this.lastError,
       trace: this.trace.map((entry) => ({ ...entry })),
       interruptions: this.interruptions.map((marker) => ({ ...marker })),
+      responseDiagnostics: this.responseDiagnostics.map((item) => ({ ...item })),
       consecutiveSuccessfulInterruptions: countConsecutiveSuccesses(
         this.interruptions,
       ),
@@ -555,6 +567,7 @@ export class RealtimeClient implements BoardContextPublisher {
           this.clearAutomaticResponseCreationTimeout();
         }
         if (coordinated) this.trackResponseSettlement(this.activeResponseId);
+        if (coordinated) this.updateResponseDiagnostic(coordinated, "created", this.activeResponseId);
       }
       this.emitSnapshot();
       return;
@@ -563,6 +576,7 @@ export class RealtimeClient implements BoardContextPublisher {
     if (event.type === SERVER_EVENTS.OUTPUT_AUDIO_BUFFER_STARTED) {
       const responseId = getResponseId(event);
       if (responseId) {
+        this.clearNarrationAudioStartFallback(responseId);
         this.setMicrophoneEnabled(false);
         this.playbackResponseId = responseId;
         this.activeResponseId = responseId;
@@ -577,6 +591,7 @@ export class RealtimeClient implements BoardContextPublisher {
       event.type === SERVER_EVENTS.OUTPUT_AUDIO_BUFFER_CLEARED
     ) {
       const responseId = getResponseId(event) ?? this.playbackResponseId;
+      if (responseId) this.clearNarrationAudioStartFallback(responseId);
       this.emitResponseLifecycle(responseId, "playback_stopped");
       if (event.type === SERVER_EVENTS.OUTPUT_AUDIO_BUFFER_CLEARED && responseId) {
         this.settleInterruption(responseId, "cleared");
@@ -656,6 +671,15 @@ export class RealtimeClient implements BoardContextPublisher {
         if (failed) this.emitFailedResponse(failed);
       } else {
         this.emitResponseLifecycle(responseId, "generation_done");
+        if (
+          responseId &&
+          responseStatus === "completed" &&
+          coordinated?.purpose === "lesson_narration" &&
+          !coordinated.activitySeen &&
+          responseId !== this.playbackResponseId
+        ) {
+          this.scheduleNarrationAudioStartFallback(responseId);
+        }
       }
       if (
         responseId &&
@@ -822,12 +846,19 @@ export class RealtimeClient implements BoardContextPublisher {
     if (stage === "activity") this.responseCoordinator.markActivity(responseId);
     if (stage === "generation_done") this.responseCoordinator.markGenerationDone(responseId);
     if (stage === "playback_stopped") this.responseCoordinator.markPlaybackStopped(responseId);
+    const stageMap: Record<typeof stage, ResponseDiagnosticStage> = {
+      activity: "audio_started",
+      generation_done: "generation_done",
+      playback_stopped: "playback_stopped",
+    };
+    this.updateResponseDiagnostic(response, stageMap[stage], responseId);
     if (response.context) {
       this.emitPurposeEvent(response.purpose, stage, response.context);
     }
     this.responseCoordinator.releaseIfSettled(responseId);
     if (!this.responseCoordinator.get(responseId)) {
       this.clearResponseSettlementTimeout(responseId);
+      this.updateResponseDiagnostic(response, "settled", responseId);
     }
   }
 
@@ -865,6 +896,7 @@ export class RealtimeClient implements BoardContextPublisher {
   }
 
   private emitFailedResponse(response: CoordinatedResponse): void {
+    this.updateResponseDiagnostic(response, "failed", response.responseId, "response_failed");
     if (!response.context) return;
     if (response.purpose === "lesson_narration") {
       this.emitSemanticEvent({ type: "narration.failed", context: response.context });
@@ -922,6 +954,64 @@ export class RealtimeClient implements BoardContextPublisher {
       response_id: responseId,
     });
     this.emitSnapshot();
+  }
+
+  private recordResponseDiagnostic(
+    key: string,
+    purpose: ResponsePurpose,
+    context?: NarrationContext,
+  ): void {
+    if (this.responseDiagnostics.some((item) => item.key === key)) return;
+    this.responseDiagnostics = [
+      ...this.responseDiagnostics,
+      {
+        key,
+        purpose,
+        ...(context
+          ? { request_id: context.requestId, step_id: context.stepId, cycle: context.cycle }
+          : {}),
+        registered_at_ms: round(this.now() - this.startedAt),
+        stage: "registered",
+      },
+    ].slice(-32);
+  }
+
+  private updateResponseDiagnostic(
+    response: CoordinatedResponse,
+    stage: ResponseDiagnosticStage,
+    responseId?: string,
+    failureCode?: string,
+  ): void {
+    const matching = this.responseDiagnostics.find((item) =>
+      (response.clientEventId && item.key === response.clientEventId) ||
+      (response.responseId && item.response_id === response.responseId) ||
+      (item.purpose === response.purpose &&
+        item.request_id === response.context?.requestId &&
+        item.step_id === response.context?.stepId &&
+        item.cycle === response.context?.cycle &&
+        item.stage === "registered"),
+    );
+    const key = matching?.key ?? response.clientEventId ?? response.responseId ?? response.purpose;
+    const existing = matching;
+    if (!existing) {
+      this.recordResponseDiagnostic(key, response.purpose, response.context);
+    }
+    const atMs = round(this.now() - this.startedAt);
+    this.responseDiagnostics = this.responseDiagnostics.map((item) => {
+      if (item.key !== key) return item;
+      const next: ResponseDiagnostic = {
+        ...item,
+        ...(responseId ? { response_id: sanitizeTraceIdentifier(responseId) } : {}),
+        stage,
+        ...(failureCode ? { failure_code: failureCode } : {}),
+      };
+      if (stage === "created") next.created_at_ms ??= atMs;
+      if (stage === "audio_started") next.audio_started_at_ms ??= atMs;
+      if (stage === "generation_done") next.generation_done_at_ms ??= atMs;
+      if (stage === "playback_stopped") next.playback_stopped_at_ms ??= atMs;
+      if (stage === "settled" || stage === "failed" || stage === "timed_out") next.terminal_at_ms ??= atMs;
+      return next;
+    });
   }
 
   private markPossibleStaleOutput(responseId: string | undefined): void {
@@ -992,6 +1082,7 @@ export class RealtimeClient implements BoardContextPublisher {
           teach: this.callbacks.onTeachRequested,
           deixis: this.callbacks.onDeixisRequested,
           annotate: this.callbacks.onAnnotateRequested,
+          drawScratch: this.callbacks.onDrawScratchRequested,
           drawQaAnnotation: this.callbacks.onDrawQaAnnotationRequested,
         });
         this.sendEvent(createFunctionCallOutput(call.callId, result));
@@ -1004,6 +1095,7 @@ export class RealtimeClient implements BoardContextPublisher {
           if (result.status === "started") lessonStarted = true;
           if (result.status === "shown") localActionShown = true;
           if (result.status === "annotation_started") annotationStarted = true;
+          if (result.status === "scratch_started") annotationStarted = true;
           if (result.status === "qa_annotation_shown") localActionShown = true;
         }
       }
@@ -1082,6 +1174,7 @@ export class RealtimeClient implements BoardContextPublisher {
       const failed = this.responseCoordinator.failByClientEventId(clientEventId);
       if (!failed) return;
       this.emitFailedResponse(failed);
+      this.updateResponseDiagnostic(failed, "timed_out", undefined, "response_create_timeout");
       this.addLocalTrace("response.create_timeout", { code: "timeout" });
     }, RESPONSE_CREATED_TIMEOUT_MS);
     this.responseCreateTimeouts.set(clientEventId, timeout);
@@ -1099,6 +1192,7 @@ export class RealtimeClient implements BoardContextPublisher {
       const failed = this.responseCoordinator.failAutomatic(purpose, context);
       if (!failed) return;
       this.emitFailedResponse(failed);
+      this.updateResponseDiagnostic(failed, "timed_out", undefined, "automatic_response_create_timeout");
       this.addLocalTrace("response.automatic_create_timeout", { code: "timeout" });
       this.emitSnapshot();
     }, RESPONSE_CREATED_TIMEOUT_MS);
@@ -1140,6 +1234,7 @@ export class RealtimeClient implements BoardContextPublisher {
       if (this.activeResponseId === responseId) this.activeResponseId = undefined;
       if (this.playbackResponseId === responseId) this.playbackResponseId = undefined;
       this.emitFailedResponse(failed);
+      this.updateResponseDiagnostic(failed, "timed_out", responseId, "response_settlement_timeout");
       this.addLocalTrace("response.settlement_timeout", {
         response_id: responseId,
         code: "timeout",
@@ -1152,6 +1247,41 @@ export class RealtimeClient implements BoardContextPublisher {
     const timeout = this.responseSettlementTimeouts.get(responseId);
     if (timeout !== undefined) window.clearTimeout(timeout);
     this.responseSettlementTimeouts.delete(responseId);
+  }
+
+  private scheduleNarrationAudioStartFallback(responseId: string): void {
+    this.clearNarrationAudioStartFallback(responseId);
+    const attempt = this.attempt;
+    const timeout = window.setTimeout(() => {
+      this.narrationAudioStartFallbacks.delete(responseId);
+      if (attempt !== this.attempt) return;
+      const response = this.responseCoordinator.get(responseId);
+      if (!response || response.activitySeen || response.playbackStopped) return;
+      if (this.interruptedResponseIds.has(responseId)) return;
+      this.addLocalTrace("narration.audio_start_assumed", {
+        response_id: responseId,
+        code: "fallback",
+      });
+      this.setMicrophoneEnabled(false);
+      this.playbackResponseId = responseId;
+      this.activeResponseId = responseId;
+      this.emitResponseLifecycle(responseId, "activity");
+      this.emitSnapshot();
+    }, NARRATION_AUDIO_START_FALLBACK_MS);
+    this.narrationAudioStartFallbacks.set(responseId, timeout);
+  }
+
+  private clearNarrationAudioStartFallback(responseId: string): void {
+    const timeout = this.narrationAudioStartFallbacks.get(responseId);
+    if (timeout !== undefined) window.clearTimeout(timeout);
+    this.narrationAudioStartFallbacks.delete(responseId);
+  }
+
+  private clearNarrationAudioStartFallbacks(): void {
+    for (const timeout of this.narrationAudioStartFallbacks.values()) {
+      window.clearTimeout(timeout);
+    }
+    this.narrationAudioStartFallbacks.clear();
   }
 
   private clearResponseSettlementTimeouts(): void {
@@ -1277,6 +1407,7 @@ export class RealtimeClient implements BoardContextPublisher {
     this.clearResponseCreationTimeouts();
     this.clearAutomaticResponseCreationTimeout();
     this.clearResponseSettlementTimeouts();
+    this.clearNarrationAudioStartFallbacks();
     this.interactionGuidance = undefined;
     this.contextUpdateTail = Promise.resolve();
     this.contextPublications = [];
@@ -1286,6 +1417,7 @@ export class RealtimeClient implements BoardContextPublisher {
     this.clearContextAcknowledgement();
     this.trace = [];
     this.interruptions = [];
+    this.responseDiagnostics = [];
     this.seenCallIds.clear();
     this.seenUsageResponseIds.clear();
     this.interruptedResponseIds.clear();
@@ -1349,6 +1481,7 @@ export class RealtimeClient implements BoardContextPublisher {
     this.clearResponseCreationTimeouts();
     this.clearAutomaticResponseCreationTimeout();
     this.clearResponseSettlementTimeouts();
+    this.clearNarrationAudioStartFallbacks();
     this.playbackResponseId = undefined;
   }
 }

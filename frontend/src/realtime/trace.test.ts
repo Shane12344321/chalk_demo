@@ -41,7 +41,7 @@ describe("redacted trace", () => {
     expect(exported).not.toContain("private\"");
     expect(exported).toContain('"type": "server_vad"');
     expect(exported).toContain('"model": "gpt-realtime-2.1-mini"');
-    expect(exported).toContain('"max_output_tokens": 256');
+    expect(exported).toContain('"max_output_tokens": 1024');
     expect(exported).toContain('"hashes_match": true');
     expect(exported).toContain('"latency_ms": 12.3');
   });

@@ -178,3 +178,57 @@ describe("routeToolCall", () => {
     });
   });
 });
+
+describe("draw_scratch routing", () => {
+  it("routes a valid scratch request to the handler", () => {
+    const drawScratch = vi.fn().mockReturnValue({ requestId: "req_1" });
+    expect(
+      routeToolCall(
+        {
+          callId: "call_1",
+          name: "draw_scratch",
+          argumentsJson: '{"description":"a labeled right triangle"}',
+        },
+        { drawScratch },
+      ),
+    ).toEqual({ ok: true, status: "scratch_started", request_id: "req_1" });
+    expect(drawScratch).toHaveBeenCalledWith("a labeled right triangle");
+  });
+
+  it.each([
+    "{}",
+    '{"description":"ab"}',
+    JSON.stringify({ description: "x".repeat(201) }),
+    '{"description":"valid enough","extra":true}',
+  ])("soft-fails invalid scratch arguments: %s", (argumentsJson) => {
+    expect(
+      routeToolCall(
+        { callId: "call_1", name: "draw_scratch", argumentsJson },
+        { drawScratch: vi.fn() },
+      ),
+    ).toEqual({ ok: false, reason: "invalid_arguments" });
+  });
+
+  it("soft-fails when no handler is wired", () => {
+    expect(
+      routeToolCall({
+        callId: "call_1",
+        name: "draw_scratch",
+        argumentsJson: '{"description":"a labeled right triangle"}',
+      }),
+    ).toEqual({ ok: false, reason: "handler_unavailable" });
+  });
+
+  it("reports lesson_busy when the handler declines", () => {
+    expect(
+      routeToolCall(
+        {
+          callId: "call_1",
+          name: "draw_scratch",
+          argumentsJson: '{"description":"a labeled right triangle"}',
+        },
+        { drawScratch: () => undefined },
+      ),
+    ).toEqual({ ok: false, reason: "lesson_busy" });
+  });
+});

@@ -339,6 +339,86 @@ describe("RealtimeClient event coordination", () => {
     expect(semanticEvents.at(-1)).toEqual({ type: "narration.activity", context });
   });
 
+  it("assumes narration playback after a bounded wait when the started event is missed", () => {
+    vi.useFakeTimers();
+    try {
+      const semanticEvents: RealtimeSemanticEvent[] = [];
+      const { client, harness, latest } = createHarness(vi.fn(), (event) =>
+        semanticEvents.push(event),
+      );
+      harness.status = "connected";
+      const context = { requestId: "req-1", stepId: "s1", cycle: 1 };
+      client.requestNarration("A short deterministic lesson line.", context);
+      harness.handleServerEvent({
+        type: SERVER_EVENTS.RESPONSE_CREATED,
+        response: {
+          id: "resp_lesson",
+          metadata: {
+            chalk_kind: "lesson_narration",
+            chalk_request_id: "req-1",
+            chalk_step_id: "s1",
+            chalk_cycle: "1",
+          },
+        },
+      });
+      harness.handleServerEvent(responseDone("resp_lesson", "completed"));
+      expect(
+        semanticEvents.some((event) => event.type === "narration.activity"),
+      ).toBe(false);
+
+      vi.advanceTimersByTime(4_000);
+      expect(semanticEvents.some((event) => event.type === "narration.activity")).toBe(true);
+      expect(
+        latest().trace.some(
+          (entry) =>
+            entry.type === "narration.audio_start_assumed" &&
+            entry.response_id === "resp_lesson",
+        ),
+      ).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not assume narration playback when the started event arrives in time", () => {
+    vi.useFakeTimers();
+    try {
+      const semanticEvents: RealtimeSemanticEvent[] = [];
+      const { client, harness, latest } = createHarness(vi.fn(), (event) =>
+        semanticEvents.push(event),
+      );
+      harness.status = "connected";
+      const context = { requestId: "req-1", stepId: "s1", cycle: 1 };
+      client.requestNarration("A short deterministic lesson line.", context);
+      harness.handleServerEvent({
+        type: SERVER_EVENTS.RESPONSE_CREATED,
+        response: {
+          id: "resp_lesson",
+          metadata: {
+            chalk_kind: "lesson_narration",
+            chalk_request_id: "req-1",
+            chalk_step_id: "s1",
+            chalk_cycle: "1",
+          },
+        },
+      });
+      harness.handleServerEvent(responseDone("resp_lesson", "completed"));
+      harness.handleServerEvent({
+        type: SERVER_EVENTS.OUTPUT_AUDIO_BUFFER_STARTED,
+        response_id: "resp_lesson",
+      });
+      vi.advanceTimersByTime(10_000);
+      expect(
+        semanticEvents.filter((event) => event.type === "narration.activity"),
+      ).toHaveLength(1);
+      expect(
+        latest().trace.some((entry) => entry.type === "narration.audio_start_assumed"),
+      ).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("binds the native fetch receiver", async () => {
     const originalFetch = globalThis.fetch;
     const receiverCheckingFetch = vi.fn(function (this: unknown) {

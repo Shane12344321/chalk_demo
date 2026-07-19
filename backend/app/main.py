@@ -17,6 +17,7 @@ from app.middleware import (
     SESSION_BODY_MAX_BYTES,
     SessionBodyLimitMiddleware,
 )
+from app.scratch import router as scratch_router
 from app.sessions import router
 
 
@@ -50,6 +51,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "/lesson": LESSON_BODY_MAX_BYTES,
             "/lesson/continue": LESSON_CONTINUATION_BODY_MAX_BYTES,
             "/annotate": ANNOTATION_BODY_MAX_BYTES,
+            "/scratch": ANNOTATION_BODY_MAX_BYTES,
         },
     )
     application.add_middleware(
@@ -73,6 +75,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     application.include_router(router)
     application.include_router(lesson_router)
     application.include_router(annotation_router)
+    application.include_router(scratch_router)
     return application
 
 

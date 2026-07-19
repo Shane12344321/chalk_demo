@@ -12,6 +12,7 @@ export type ToolResult =
   | { ok: true; status: "started"; request_id: string }
   | { ok: true; status: "shown"; overlay_id: string }
   | { ok: true; status: "annotation_started"; request_id: string }
+  | { ok: true; status: "scratch_started"; request_id: string }
   | { ok: true; status: "qa_annotation_shown"; request_id: string; marks: number }
   | {
       ok: false;
@@ -28,6 +29,7 @@ export interface ToolHandlers {
   teach?: (topic: string, studentContext: string) => { requestId: string };
   deixis?: (kind: DeixisKind, elementId: string) => { overlayId: string } | undefined;
   annotate?: (request: string) => { requestId: string } | undefined;
+  drawScratch?: (description: string) => { requestId: string } | undefined;
   drawQaAnnotation?: (
     marks: readonly QaAnnotationMark[],
   ) =>
@@ -74,6 +76,14 @@ export function routeToolCall(call: FunctionCall, handlers: ToolHandlers = {}): 
     return started
       ? { ok: true, status: "annotation_started", request_id: started.requestId }
       : { ok: false, reason: "unknown_element" };
+  }
+  if (call.name === "draw_scratch") {
+    if (!isDrawScratchArguments(parsed)) return { ok: false, reason: "invalid_arguments" };
+    if (!handlers.drawScratch) return { ok: false, reason: "handler_unavailable" };
+    const started = handlers.drawScratch(parsed.description);
+    return started
+      ? { ok: true, status: "scratch_started", request_id: started.requestId }
+      : { ok: false, reason: "lesson_busy" };
   }
   if (call.name === "draw_qa_annotation") {
     const marks = qaAnnotationMarks(parsed);
@@ -145,6 +155,17 @@ function validElementId(value: unknown): value is string {
 
 function validSide(value: unknown): value is "above" | "below" | "left" | "right" {
   return value === "above" || value === "below" || value === "left" || value === "right";
+}
+
+function isDrawScratchArguments(value: unknown): value is { description: string } {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
+  const record = value as Record<string, unknown>;
+  return (
+    Object.keys(record).length === 1 &&
+    typeof record.description === "string" &&
+    record.description.trim().length >= 3 &&
+    record.description.length <= 200
+  );
 }
 
 function isAnnotateArguments(value: unknown): value is { request: string } {

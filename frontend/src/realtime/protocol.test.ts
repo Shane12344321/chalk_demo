@@ -37,7 +37,7 @@ describe("Realtime protocol builders", () => {
         type: "realtime",
         model: "gpt-realtime-2.1-mini",
         output_modalities: ["audio"],
-        max_output_tokens: 256,
+        max_output_tokens: 1_024,
         audio: {
           input: {
             turn_detection: {
@@ -63,6 +63,7 @@ describe("Realtime protocol builders", () => {
       "circle_el",
       "underline",
       "flash",
+      "draw_scratch",
       "annotate",
     ]);
     expect(event.session.instructions).not.toContain("debug echo");
@@ -80,6 +81,7 @@ describe("Realtime protocol builders", () => {
       "circle_el",
       "underline",
       "flash",
+      "draw_scratch",
       "annotate",
       "debug_echo",
     ]);
@@ -117,6 +119,7 @@ describe("Realtime protocol builders", () => {
       "flash",
       "trace_path",
       "focus_on",
+      "draw_scratch",
       "annotate",
     ]);
     expect(enabled.session.instructions).toContain("add no permanent ink");
@@ -238,7 +241,7 @@ describe("Realtime protocol builders", () => {
     });
     expect(createResponseAfterTool()).toEqual({
       type: "response.create",
-      response: { output_modalities: ["audio"] },
+      response: { output_modalities: ["audio"], max_output_tokens: 120 },
     });
   });
 

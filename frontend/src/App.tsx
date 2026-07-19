@@ -44,9 +44,13 @@ import type {
   PerceivedAudioStop,
   RealtimeSemanticEvent,
   RealtimeSnapshot,
+  ResponseDiagnostic,
   TraceEntry,
 } from "./realtime";
 import { SESSION_TOKEN_BUDGET } from "./realtime/protocol";
+import { ScratchClient } from "./scratch/client";
+import { ScratchWindow } from "./scratch/ScratchWindow";
+import type { NormalizedLesson as ScratchLesson } from "./board/decode";
 import type { QaAnnotationMark } from "./realtime/toolRouter";
 import { useFixedLessonSync } from "./sync/useFixedLessonSync";
 
@@ -68,6 +72,7 @@ const INITIAL_SNAPSHOT: RealtimeSnapshot = {
   microphoneEnabled: false,
   trace: [],
   interruptions: [],
+  responseDiagnostics: [],
   consecutiveSuccessfulInterruptions: 0,
   toolRoundTrips: 0,
   tokenUsage: {
@@ -81,6 +86,33 @@ const INITIAL_SNAPSHOT: RealtimeSnapshot = {
   tokenBudget: SESSION_TOKEN_BUDGET,
   contextPublications: [],
 };
+
+const VOICE_LIFECYCLE_TRACE = new Set([
+  "response.create",
+  "response.created",
+  "response.cancel",
+  "response.done",
+  "output_audio_buffer.started",
+  "output_audio_buffer.stopped",
+  "output_audio_buffer.cleared",
+  "input_audio_buffer.speech_started",
+  "input_audio_buffer.speech_stopped",
+  "conversation.item.truncated",
+  "session.token_budget_reached",
+  "narration.audio_start_assumed",
+  "error",
+]);
+const VOICE_FAILURE_TRACE =
+  /timeout|failed|rejected|error|possible_stale|token_budget|deactivated/u;
+
+function isVoiceLifecycleTrace(type: string): boolean {
+  return (
+    VOICE_LIFECYCLE_TRACE.has(type) ||
+    type.startsWith("interruption.") ||
+    type.startsWith("handler_state.") ||
+    VOICE_FAILURE_TRACE.test(type)
+  );
+}
 
 function checkedCachedLesson(source: unknown, name: string): NormalizedLesson {
   const result = decodeLesson(source);
@@ -154,6 +186,10 @@ function App() {
   if (!annotationClientRef.current) {
     annotationClientRef.current = new AnnotationClient(API_BASE_URL, clientIdRef.current);
   }
+  const scratchClientRef = useRef<ScratchClient>();
+  if (!scratchClientRef.current) {
+    scratchClientRef.current = new ScratchClient(API_BASE_URL, clientIdRef.current!);
+  }
   const semanticHandlerRef = useRef<(event: RealtimeSemanticEvent) => void>();
   const qaAnnotationHandlerRef = useRef<
     (marks: readonly QaAnnotationMark[]) =>
@@ -214,6 +250,46 @@ function App() {
   );
   const [generationTiming, setGenerationTiming] = useState<M3GenerationTiming>();
   const [reviewStepIndex, setReviewStepIndex] = useState(0);
+  const [engineFeed, setEngineFeed] = useState<
+    { id: number; atMs: number; kind: string; message: string }[]
+  >([]);
+  const engineFeedSequenceRef = useRef(0);
+  const engineStepCountRef = useRef<{ requestId?: string; count: number }>({ count: 0 });
+  const logEngine = useCallback((kind: string, message: string) => {
+    setEngineFeed((current) => [
+      ...current.slice(-249),
+      {
+        id: (engineFeedSequenceRef.current += 1),
+        atMs: performance.now(),
+        kind,
+        message,
+      },
+    ]);
+  }, []);
+  const lastTraceSequenceRef = useRef(0);
+  useEffect(() => {
+    const fresh = snapshot.trace.filter(
+      (entry) => entry.sequence > lastTraceSequenceRef.current,
+    );
+    if (fresh.length === 0) return;
+    lastTraceSequenceRef.current = fresh[fresh.length - 1].sequence;
+    for (const entry of fresh) {
+      if (!isVoiceLifecycleTrace(entry.type)) continue;
+      const failure =
+        VOICE_FAILURE_TRACE.test(entry.type) ||
+        entry.status === "failure" ||
+        entry.status === "incomplete" ||
+        entry.status === "cancelled" ||
+        entry.status === "failed";
+      const parts = [
+        entry.direction === "client" ? `→ ${entry.type}` : `← ${entry.type}`,
+        entry.response_id ? `resp …${entry.response_id.slice(-6)}` : undefined,
+        entry.status ? `status ${entry.status}` : undefined,
+        entry.code ? `code ${entry.code}` : undefined,
+      ].filter((part): part is string => Boolean(part));
+      logEngine(failure ? "voice✗" : "voice", parts.join(" · "));
+    }
+  }, [snapshot.trace, logEngine]);
   const realtimeResponseBusy =
     snapshot.responseInFlight ||
     Boolean(snapshot.activeResponseId) ||
@@ -228,6 +304,24 @@ function App() {
     syncMode: snapshot.syncMode ?? "fixed",
   });
   semanticHandlerRef.current = lessonSync.onSemanticEvent;
+  const lastSyncPhaseRef = useRef<string>();
+  useEffect(() => {
+    const previous = lastSyncPhaseRef.current;
+    const next = lessonSync.state.phase;
+    if (previous === next) return;
+    lastSyncPhaseRef.current = next;
+    if (previous === undefined) return;
+    logEngine(
+      "sync",
+      `${previous} → ${next} · step ${lessonSync.state.currentStepIndex + 1}` +
+        ` · ${Math.round(lessonSync.state.currentStepProgress * 100)}% drawn`,
+    );
+  }, [
+    lessonSync.state.phase,
+    lessonSync.state.currentStepIndex,
+    lessonSync.state.currentStepProgress,
+    logEngine,
+  ]);
 
   const {
     overlays: attentionOverlays,
@@ -292,6 +386,11 @@ function App() {
     const visible = visibleBoardRef.current;
     if (visible.elements.length === 0) return undefined;
     const requestId = crypto.randomUUID();
+    logEngine(
+      "annot→",
+      `POST /annotate · manifest v${visible.version} · ${visible.elements.length} visible elements · ` +
+        `question "${question.slice(0, 80)}"`,
+    );
     void annotationClientRef.current
       ?.start({
         requestId,
@@ -301,17 +400,55 @@ function App() {
         visibleElements: toAnnotationVisibleElements(visible.elements),
       })
       .then((result) => {
-        if (visibleBoardRef.current.version !== result.program.manifest_version) return;
+        if (visibleBoardRef.current.version !== result.program.manifest_version) {
+          logEngine("annot✗", "annotation result discarded: manifest version changed");
+          return;
+        }
+        logEngine(
+          "annot←",
+          `${result.program.ops.length} overlay op(s) [${result.program.ops
+            .map((op) => op.op)
+            .join(", ")}]`,
+        );
         setAnnotationOps([...result.program.ops]);
       })
       .catch((error: unknown) => {
         if (error instanceof DOMException && error.name === "AbortError") return;
+        logEngine("annot✗", "annotation request failed; continuing without overlay ink");
         setContextError(
           "Explanatory ink was unavailable; Chalk can continue with the visible board.",
         );
       });
     return { requestId };
-  }, []);
+  }, [logEngine]);
+
+  const [scratchCard, setScratchCard] = useState<ScratchLesson>();
+  const requestScratchCard = useCallback(
+    (description: string) => {
+      const requestId = crypto.randomUUID();
+      logEngine(
+        "scratch→",
+        `POST /scratch req ${requestId.slice(0, 8)} · "${description.slice(0, 80)}"`,
+      );
+      void scratchClientRef.current
+        ?.start({ requestId, description })
+        .then((result) => {
+          logEngine(
+            "scratch←",
+            `card "${result.lesson.title}" · ops [${result.lesson.steps[0].ops
+              .map((op) => op.op)
+              .join(", ")}] · ${result.repairs} repairs`,
+          );
+          setScratchCard(result.lesson);
+        })
+        .catch((error: unknown) => {
+          if (error instanceof DOMException && error.name === "AbortError") return;
+          logEngine("scratch✗", "scratch card failed; Chalk continues without it");
+        });
+      return { requestId };
+    },
+    [logEngine],
+  );
 
   qaAnnotationHandlerRef.current = (marks) => {
     const built = buildQaAnnotationProgram(
@@ -353,6 +490,7 @@ function App() {
         },
         onDeixisRequested: showDeixis,
         onAnnotateRequested: requestAnnotation,
+        onDrawScratchRequested: requestScratchCard,
         ...(QA_DIRECT_DRAW
           ? {
               onDrawQaAnnotationRequested: (marks: readonly QaAnnotationMark[]) =>
@@ -375,9 +513,10 @@ function App() {
       lessonContinuationRef.current?.cancel();
       clearDeixisOverlays();
       clearAnnotations();
+      scratchClientRef.current?.cancel();
       void client.disconnect();
     };
-  }, [clearAnnotations, clearDeixisOverlays, requestAnnotation, showDeixis]);
+  }, [clearAnnotations, clearDeixisOverlays, requestAnnotation, requestScratchCard, showDeixis]);
 
   useEffect(() => {
     clearDeixisOverlays();
@@ -508,9 +647,11 @@ function App() {
     const client = clientRef.current;
     if (!client) return;
     clearAnnotations();
+    logEngine("manifest→", `publishing empty board grounding for "${activeLesson.lesson.title}"`);
     void client
       .setBoardContext(buildBoardManifest(activeLesson.lesson.title, []))
       .then(() => {
+        logEngine("manifest✓", "board grounding acknowledged (session.updated)");
         setContextError(undefined);
         lessonSync.start();
       })
@@ -535,6 +676,8 @@ function App() {
     }
     clearDeixisOverlays();
     clearAnnotations();
+    scratchClientRef.current?.cancel();
+    setScratchCard(undefined);
     lessonContinuationRef.current?.cancel();
     measurementCacheRef.current!.beginLesson();
     const requestId = crypto.randomUUID();
@@ -543,6 +686,13 @@ function App() {
       lessonSync.abort(requestId);
     }
     activeGenerationTokenRef.current = requestId;
+    engineStepCountRef.current = { requestId, count: 0 };
+    logEngine(
+      "lesson→",
+      `POST /lesson req ${requestId.slice(0, 8)} · topic "${normalizedTopic}"` +
+        (studentContext ? ` · context "${studentContext.slice(0, 80)}"` : "") +
+        ` · mode ${LESSON_GENERATION_MODE} · empty board state`,
+    );
     const timing = { requestId, requestedAtMs: performance.now() };
     generationTimingRef.current = timing;
     setGenerationTiming(timing);
@@ -570,6 +720,19 @@ function App() {
         },
         (progress: LessonStreamProgress) => {
           if (progress.steps.length === 0) return;
+          if (
+            engineStepCountRef.current.requestId === progress.requestId &&
+            progress.steps.length > engineStepCountRef.current.count
+          ) {
+            for (const step of progress.steps.slice(engineStepCountRef.current.count)) {
+              logEngine(
+                "step←",
+                `accepted "${step.id}" · ops [${step.ops.map((op) => op.op).join(", ")}]` +
+                  (step.checkpoint ? " · checkpoint" : ""),
+              );
+            }
+            engineStepCountRef.current.count = progress.steps.length;
+          }
           premeasureLessonRoots(measurementCacheRef.current!, progress.steps);
           const progressRenderContext = boardRenderContextForPlan(progress.plan);
           const currentTiming = generationTimingRef.current;
@@ -640,6 +803,15 @@ function App() {
           generationTimingRef.current = updatedTiming;
           setGenerationTiming(updatedTiming);
         }
+        logEngine(
+          "lesson✓",
+          `opening call done · ${result.steps.length} accepted · ${result.repairs} repairs · ` +
+            `${result.droppedSteps} dropped · ${result.browserDroppedSteps} browser-dropped` +
+            (result.boardModel ? ` · ${result.boardModel}/${result.boardReasoningEffort ?? "?"}` : "") +
+            (result.boardPromptSha256 ? ` · prompt ${result.boardPromptSha256.slice(0, 8)}` : "") +
+            (result.partial ? " · PARTIAL" : "") +
+            (result.continuationAvailable ? " · continuation available" : ""),
+        );
         let resolvedLesson = result.lesson;
         const renderContext = boardRenderContextForPlan(result.plan);
         let repairs = result.repairs;
@@ -679,6 +851,13 @@ function App() {
               ?.filter((finding) => finding.status === "pending")
               .map((finding) => finding.finding_id) ?? [];
             try {
+              logEngine(
+                "cont→",
+                `POST /lesson/continue · prefix v${prefixVersion} · scene ${scene.elements.length} elements` +
+                  (attemptedRecoveryIds.length > 0
+                    ? ` · retrying ${attemptedRecoveryIds.length} recovery finding(s)`
+                    : ""),
+              );
               const continuation = await lessonContinuationRef.current!.next({
                 requestId: result.requestId,
                 topic: normalizedTopic,
@@ -692,6 +871,16 @@ function App() {
               });
               if (activeGenerationTokenRef.current !== result.requestId) return;
               repairs = continuation.repairs;
+              logEngine(
+                "cont←",
+                continuation.done
+                  ? `continuation done · reason ${continuation.reason}`
+                  : continuation.browserDropped
+                    ? "continuation step rejected by browser validation"
+                    : `accepted "${continuation.step.id}" · ops [${continuation.step.ops
+                        .map((op) => op.op)
+                        .join(", ")}] · ${continuation.repairs} total repairs`,
+              );
               if (continuation.done) {
                 recoveryLedger.settle(
                   result.requestId,
@@ -770,6 +959,10 @@ function App() {
               });
             } catch (error) {
               if (error instanceof DOMException && error.name === "AbortError") return;
+              logEngine(
+                "cont✗",
+                `continuation failed (${error instanceof Error ? error.name : "error"}); finishing with accepted prefix`,
+              );
               recoveryLedger.settle(
                 result.requestId,
                 attemptedRecoveryIds,
@@ -813,6 +1006,11 @@ function App() {
         measurementCacheRef.current!.beginLesson();
         const fallbackRequestId = crypto.randomUUID();
         const fallbackLesson = CACHED_LESSONS[pickCachedLessonKey(normalizedTopic)];
+        logEngine(
+          "lesson✗",
+          `live generation failed (${error instanceof Error ? error.message.slice(0, 100) : "unknown"}) · ` +
+            `cached fallback "${fallbackLesson.title}"`,
+        );
         setActiveLesson({
           lesson: fallbackLesson,
           requestId: fallbackRequestId,
@@ -1214,6 +1412,35 @@ function App() {
             {lessonSync.state.ignoredEvents > 0 ? <span>{lessonSync.state.ignoredEvents} stale/invalid events ignored</span> : null}
           </div>
         ) : null}
+        {engineFeed.length > 0 ? (
+          <details className="engine-feed" open={isDiagnostics}>
+            <summary>
+              Board engine feed · {engineFeed.length} event{engineFeed.length === 1 ? "" : "s"}
+            </summary>
+            <div className="engine-feed-toolbar">
+              <button
+                className="secondary"
+                type="button"
+                onClick={() => setEngineFeed([])}
+              >
+                Clear feed
+              </button>
+            </div>
+            <ol className="engine-feed-rows">
+              {[...engineFeed].reverse().map((event) => (
+                <li key={event.id}>
+                  <span className="engine-feed-time">
+                    +{((event.atMs - engineFeed[0].atMs) / 1000).toFixed(1)}s
+                  </span>
+                  <span className={`engine-feed-kind ${event.kind.endsWith("✗") ? "engine-feed-fail" : ""}`}>
+                    {event.kind}
+                  </span>
+                  <span className="engine-feed-message">{event.message}</span>
+                </li>
+              ))}
+            </ol>
+          </details>
+        ) : null}
         {activeLesson.source === "review" ? (
           <p className="lesson-hint">
             Local review mode shows all accepted geometry through the selected step. Capture the board and record the human layout verdict in the evaluation summary.
@@ -1426,8 +1653,35 @@ function App() {
             </div>
           )}
         </article>
+
+        <article className="panel response-diagnostics-panel">
+          <div className="panel-heading">
+            <div>
+              <p className="eyebrow">Response state machine</p>
+              <h2>Voice response ledger</h2>
+            </div>
+            <span className="count">{snapshot.responseDiagnostics.length}</span>
+          </div>
+          <p className="panel-note">
+            This shows where a response stopped: registered, created, audio started,
+            generation finished, playback stopped, or terminal failure. IDs and timing
+            only—no transcript or audio is retained.
+          </p>
+          {snapshot.responseDiagnostics.length === 0 ? (
+            <EmptyState>Start a response to capture its lifecycle.</EmptyState>
+          ) : (
+            <ol className="response-ledger" role="log" aria-live="polite">
+              {[...snapshot.responseDiagnostics].reverse().map((response) => (
+                <ResponseDiagnosticRow key={response.key} response={response} />
+              ))}
+            </ol>
+          )}
+        </article>
           </section>
         </>
+      ) : null}
+      {scratchCard ? (
+        <ScratchWindow lesson={scratchCard} onClose={() => setScratchCard(undefined)} />
       ) : null}
     </main>
   );
@@ -1440,6 +1694,54 @@ function StatusPill({ status }: { status: RealtimeSnapshot["status"] }) {
       {status.replaceAll("-", " ")}
     </div>
   );
+}
+
+function ResponseDiagnosticRow({ response }: { response: ResponseDiagnostic }) {
+  const createdToAudio = duration(response.created_at_ms, response.audio_started_at_ms);
+  const audioToGeneration = duration(response.audio_started_at_ms, response.generation_done_at_ms);
+  const generationToStop = duration(response.generation_done_at_ms, response.playback_stopped_at_ms);
+  const registeredToCreated = duration(response.registered_at_ms, response.created_at_ms);
+  const diagnosis = response.failure_code
+    ? response.failure_code
+    : response.stage === "registered"
+      ? "waiting for response.created"
+      : response.stage === "created"
+        ? "created, but no audio activity yet"
+        : response.stage === "audio_started"
+          ? "audio active; waiting for generation/playback settlement"
+          : response.stage === "generation_done"
+            ? "generation ended; waiting for output audio stop"
+            : response.stage === "playback_stopped"
+              ? "playback stopped; waiting for terminal cleanup"
+              : response.stage;
+  return (
+    <li className={`response-ledger-row response-stage-${response.stage}`}>
+      <div className="marker-title">
+        <strong>{response.purpose}</strong>
+        <span className="settlement">{response.stage}</span>
+      </div>
+      <p className="response-diagnosis">{diagnosis}</p>
+      <dl>
+        <div><dt>Response</dt><dd>{response.response_id ?? "not created"}</dd></div>
+        <div><dt>Registered → created</dt><dd>{formatDuration(registeredToCreated)}</dd></div>
+        <div><dt>Created → audio</dt><dd>{formatDuration(createdToAudio)}</dd></div>
+        <div><dt>Audio → generation done</dt><dd>{formatDuration(audioToGeneration)}</dd></div>
+        <div><dt>Generation → playback stop</dt><dd>{formatDuration(generationToStop)}</dd></div>
+      </dl>
+      {response.request_id && response.step_id ? (
+        <small>step {response.step_id} · cycle {response.cycle ?? "?"}</small>
+      ) : null}
+    </li>
+  );
+}
+
+function duration(start?: number, end?: number): number | undefined {
+  if (start === undefined || end === undefined) return undefined;
+  return Math.max(0, end - start);
+}
+
+function formatDuration(value?: number): string {
+  return value === undefined ? "—" : `${value.toFixed(0)} ms`;
 }
 
 function Metric({
