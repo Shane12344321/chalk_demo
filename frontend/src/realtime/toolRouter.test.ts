@@ -219,7 +219,7 @@ describe("draw_scratch routing", () => {
     ).toEqual({ ok: false, reason: "handler_unavailable" });
   });
 
-  it("reports lesson_busy when the handler declines", () => {
+  it("reports not_in_qa when the handler declines outside a conversational phase", () => {
     expect(
       routeToolCall(
         {
@@ -229,6 +229,6 @@ describe("draw_scratch routing", () => {
         },
         { drawScratch: () => undefined },
       ),
-    ).toEqual({ ok: false, reason: "lesson_busy" });
+    ).toEqual({ ok: false, reason: "not_in_qa" });
   });
 });

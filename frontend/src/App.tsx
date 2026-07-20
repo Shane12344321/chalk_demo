@@ -49,7 +49,9 @@ import type {
 } from "./realtime";
 import { SESSION_TOKEN_BUDGET } from "./realtime/protocol";
 import { ScratchClient } from "./scratch/client";
+import { scratchAllowedInPhase } from "./scratch/phaseGate";
 import { ScratchWindow } from "./scratch/ScratchWindow";
+import type { LessonPhase } from "./sync/reducer";
 import type { NormalizedLesson as ScratchLesson } from "./board/decode";
 import type { QaAnnotationMark } from "./realtime/toolRouter";
 import { useFixedLessonSync } from "./sync/useFixedLessonSync";
@@ -191,6 +193,7 @@ function App() {
     scratchClientRef.current = new ScratchClient(API_BASE_URL, clientIdRef.current!);
   }
   const semanticHandlerRef = useRef<(event: RealtimeSemanticEvent) => void>();
+  const syncPhaseRef = useRef<LessonPhase>("IDLE");
   const qaAnnotationHandlerRef = useRef<
     (marks: readonly QaAnnotationMark[]) =>
       | { ok: true; requestId: string; marks: number }
@@ -268,6 +271,13 @@ function App() {
   }, []);
   const lastTraceSequenceRef = useRef(0);
   useEffect(() => {
+    // Reconnecting resets the client trace and restarts its sequence counter
+    // from 1; without rebasing the watermark, every event from the new
+    // session would sit below it and the voice feed would stay silent.
+    const newest = snapshot.trace[snapshot.trace.length - 1];
+    if (newest && newest.sequence < lastTraceSequenceRef.current) {
+      lastTraceSequenceRef.current = 0;
+    }
     const fresh = snapshot.trace.filter(
       (entry) => entry.sequence > lastTraceSequenceRef.current,
     );
@@ -304,6 +314,7 @@ function App() {
     syncMode: snapshot.syncMode ?? "fixed",
   });
   semanticHandlerRef.current = lessonSync.onSemanticEvent;
+  syncPhaseRef.current = lessonSync.state.phase;
   const lastSyncPhaseRef = useRef<string>();
   useEffect(() => {
     const previous = lastSyncPhaseRef.current;
@@ -425,6 +436,13 @@ function App() {
   const [scratchCard, setScratchCard] = useState<ScratchLesson>();
   const requestScratchCard = useCallback(
     (description: string) => {
+      if (!scratchAllowedInPhase(syncPhaseRef.current)) {
+        logEngine(
+          "scratch✗",
+          `draw_scratch blocked in phase ${syncPhaseRef.current}; card needs a QA or idle window`,
+        );
+        return undefined;
+      }
       const requestId = crypto.randomUUID();
       logEngine(
         "scratch→",
@@ -433,6 +451,13 @@ function App() {
       void scratchClientRef.current
         ?.start({ requestId, description })
         .then((result) => {
+          if (!scratchAllowedInPhase(syncPhaseRef.current)) {
+            logEngine(
+              "scratch✗",
+              `card "${result.lesson.title}" arrived after the lesson resumed; dropped`,
+            );
+            return;
+          }
           logEngine(
             "scratch←",
             `card "${result.lesson.title}" · ops [${result.lesson.steps[0].ops

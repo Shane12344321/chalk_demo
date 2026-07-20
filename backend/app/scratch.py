@@ -18,7 +18,7 @@ from typing import Annotated, Any, Literal
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.config import Settings, get_settings
 from app.dependencies import get_openai_http_client
@@ -56,6 +56,13 @@ class ScratchRequest(BaseModel):
     request_id: CanonicalUuid4
     client_id: CanonicalUuid4
     description: str = Field(min_length=3, max_length=200)
+
+    @field_validator("description")
+    @classmethod
+    def _require_substance(cls, value: str) -> str:
+        if len(value.strip()) < 3:
+            raise ValueError("description must contain at least 3 non-whitespace-padded characters")
+        return value
 
 
 class _ScratchFailure(Exception):

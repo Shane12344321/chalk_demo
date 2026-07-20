@@ -34,9 +34,11 @@ export function ScratchWindow({ lesson, onClose }: ScratchWindowProps) {
   const onHeaderPointerMove = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     const drag = dragRef.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
+    // Keep part of the header inside the viewport; a card dragged fully
+    // offscreen has no other way back.
     setPosition({
-      x: Math.max(0, event.clientX - drag.dx),
-      y: Math.max(0, event.clientY - drag.dy),
+      x: Math.min(Math.max(0, event.clientX - drag.dx), Math.max(0, window.innerWidth - 160)),
+      y: Math.min(Math.max(0, event.clientY - drag.dy), Math.max(0, window.innerHeight - 40)),
     });
   }, []);
 

@@ -60,6 +60,12 @@ const MAX_SEEN_CALL_IDS = 256;
 const SESSION_READY_TIMEOUT_MS = 15_000;
 const RESPONSE_CREATED_TIMEOUT_MS = 8_000;
 const RESPONSE_SETTLEMENT_TIMEOUT_MS = 20_000;
+// WebRTC playout emits no data-channel heartbeat between
+// `output_audio_buffer.started` and `stopped`, so a flat settlement window
+// cannot distinguish a healthy long narration from a wedged response. While
+// playback is still attributed to the response, the window re-arms a bounded
+// number of times instead of failing a step whose audio simply runs long.
+const MAX_SETTLEMENT_EXTENSIONS = 3;
 // Narration ink is gated on observed audible playback. When consecutive
 // responses share one continuous WebRTC output buffer, the per-response
 // `output_audio_buffer.started` event can be missed entirely; without a
@@ -612,6 +618,11 @@ export class RealtimeClient implements BoardContextPublisher {
     }
 
     if (event.type === SERVER_EVENTS.INPUT_AUDIO_BUFFER_SPEECH_STARTED) {
+      // Student speech freezes the lesson, so a pending playback assumption
+      // is moot: real playback settles through cancel/cleared events, and an
+      // assumed start after the freeze would only hold the client busy and
+      // block Resume behind settlement extensions.
+      this.clearNarrationAudioStartFallbacks();
       // Refresh the already-rendered semantic snapshot at question time. The
       // update is queued ahead of later interaction-guidance changes and will
       // usually acknowledge while the student is still speaking.
@@ -1223,12 +1234,26 @@ export class RealtimeClient implements BoardContextPublisher {
     this.responseCreateTimeouts.clear();
   }
 
-  private trackResponseSettlement(responseId: string): void {
+  private trackResponseSettlement(responseId: string, extensions = 0): void {
     this.clearResponseSettlementTimeout(responseId);
     const attempt = this.attempt;
     const timeout = window.setTimeout(() => {
       this.responseSettlementTimeouts.delete(responseId);
       if (attempt !== this.attempt) return;
+      const record = this.responseCoordinator.get(responseId);
+      if (
+        record?.activitySeen &&
+        !record.playbackStopped &&
+        this.playbackResponseId === responseId &&
+        extensions < MAX_SETTLEMENT_EXTENSIONS
+      ) {
+        this.addLocalTrace("response.settlement_extended", {
+          response_id: responseId,
+          code: "playback_active",
+        });
+        this.trackResponseSettlement(responseId, extensions + 1);
+        return;
+      }
       const failed = this.responseCoordinator.failByResponseId(responseId);
       if (!failed) return;
       if (this.activeResponseId === responseId) this.activeResponseId = undefined;
@@ -1258,6 +1283,10 @@ export class RealtimeClient implements BoardContextPublisher {
       const response = this.responseCoordinator.get(responseId);
       if (!response || response.activitySeen || response.playbackStopped) return;
       if (this.interruptedResponseIds.has(responseId)) return;
+      // A different response taking the stage during the wait means the
+      // narration is stale (for example a student question superseded it).
+      // Assuming playback then would mark the wrong response busy.
+      if (this.activeResponseId !== undefined && this.activeResponseId !== responseId) return;
       this.addLocalTrace("narration.audio_start_assumed", {
         response_id: responseId,
         code: "fallback",

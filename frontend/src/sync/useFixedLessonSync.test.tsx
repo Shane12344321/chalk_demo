@@ -99,6 +99,43 @@ describe("fixed lesson synchronization effects", () => {
     expect(result.current.state.phase).toBe("IDLE");
   });
 
+  it("keeps a frozen lesson alive when a stale narration fails during QA", async () => {
+    const { result } = setup();
+    act(() => result.current.start());
+    const state = result.current.state;
+    const failedContext = {
+      requestId: state.requestId,
+      stepId: state.stepIds[state.currentStepIndex],
+      cycle: state.cycle,
+    };
+    act(() => result.current.onSemanticEvent({ type: "narration.activity", context: failedContext }));
+    act(() => result.current.onSemanticEvent({ type: "student.speech_started" }));
+    await waitFor(() => expect(result.current.state.phase).toBe("QA"));
+
+    act(() =>
+      result.current.onSemanticEvent({ type: "narration.failed", context: failedContext }),
+    );
+    expect(result.current.state.phase).toBe("QA");
+    expect(result.current.state.currentStepIndex).toBe(state.currentStepIndex);
+  });
+
+  it("ignores a narration failure from a superseded cycle while teaching", () => {
+    const { result } = setup();
+    act(() => result.current.start());
+    const state = result.current.state;
+    act(() =>
+      result.current.onSemanticEvent({
+        type: "narration.failed",
+        context: {
+          requestId: state.requestId,
+          stepId: state.stepIds[state.currentStepIndex],
+          cycle: state.cycle - 1,
+        },
+      }),
+    );
+    expect(result.current.state.phase).toBe("TEACHING");
+  });
+
   it("maps transcript character counts to a pacing hint without starting ink", () => {
     const { result } = setup();
     act(() => result.current.start());

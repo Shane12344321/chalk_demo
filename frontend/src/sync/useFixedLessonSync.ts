@@ -281,7 +281,19 @@ export function useFixedLessonSync({
       }, AUDIO_DRAIN_GUARD_MS);
     } else if (event.type === "narration.failed") {
       narrationKeyRef.current = undefined;
-      dispatch({ type: "RESET", requestId: correlation.requestId });
+      // Only the narration the lesson is actively teaching may reset it. A
+      // stale narration failed by the settlement watchdog while the student
+      // is frozen in QA must not wipe the lesson out from under them; Resume
+      // re-requests narration for the frozen step anyway.
+      const current = stateRef.current;
+      if (
+        current.phase === "TEACHING" &&
+        correlation.requestId === current.requestId &&
+        correlation.cycle === current.cycle &&
+        correlation.stepId === current.stepIds[current.currentStepIndex]
+      ) {
+        dispatch({ type: "RESET", requestId: correlation.requestId });
+      }
     } else if (event.type === "checkpoint.prompt_activity") {
       dispatch({ type: "CHECKPOINT_PROMPT_ACTIVITY", ...correlation });
       const current = stateRef.current;

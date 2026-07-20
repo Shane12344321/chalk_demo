@@ -83,7 +83,7 @@ export function routeToolCall(call: FunctionCall, handlers: ToolHandlers = {}): 
     const started = handlers.drawScratch(parsed.description);
     return started
       ? { ok: true, status: "scratch_started", request_id: started.requestId }
-      : { ok: false, reason: "lesson_busy" };
+      : { ok: false, reason: "not_in_qa" };
   }
   if (call.name === "draw_qa_annotation") {
     const marks = qaAnnotationMarks(parsed);

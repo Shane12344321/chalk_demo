@@ -162,3 +162,5 @@ def test_description_bounds_are_enforced_before_any_call() -> None:
             client.post("/scratch", json=scratch_payload(description="x" * 201)).status_code == 422
         )
         assert client.post("/scratch", json=scratch_payload(extra="field")).status_code == 422
+        assert client.post("/scratch", json=scratch_payload(description="   ")).status_code == 422
+        assert client.post("/scratch", json=scratch_payload(description="  a  ")).status_code == 422
