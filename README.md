@@ -1,5 +1,16 @@
 # CHALK
 
+CHALK is a live voice tutor for maths and physics that teaches on an whiteboard.
+
+A student asks for a topic, and CHALK generates a structured lesson, narrates it aloud, and draws the supporting equations, graphs, and diagrams as it explains. The student can interrupt with the space bar or by clicking the voice orb, ask a question about the board, and resume without losing the lesson state.
+
+The board is not just a visual output: it tracks what has actually been drawn so the tutor can ground follow-up explanations in the visible diagram.
+
+GPT 5.6 Luna creates the structured lesson plan while GPT Realtime 2.1 handles the live interaction between the interface and the student. My custom built "drawer" intermediary acts as an orchestrator between both the models and the whiteboard surface, providing a platform for Luna to "draw".
+
+
+
+
 CHALK is a localhost hackathon prototype for a math and physics tutor that talks while drawing and stops when the student interrupts. M1 proves the browser-to-OpenAI Realtime WebRTC voice foundation. M2 adds the deterministic SVG whiteboard and concurrent voice/ink synchronization. The accepted cached M4 slice adds visible-board grounding, turn-gated speech, and a tutor-initiated checkpoint. M3 now adds bounded topic-driven lesson generation through a validated NDJSON stream.
 
 
