@@ -55,6 +55,11 @@ export interface TraceEntry {
   call_id?: string;
   status?: string;
   code?: string;
+  purpose?: string;
+  reason?: string;
+  active?: boolean;
+  playback?: boolean;
+  in_flight?: boolean;
   total_tokens?: number;
   input_tokens?: number;
   output_tokens?: number;

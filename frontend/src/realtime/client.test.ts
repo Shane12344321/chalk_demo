@@ -419,6 +419,55 @@ describe("RealtimeClient event coordination", () => {
     }
   });
 
+  it("releases playback attribution when the buffer stops under a later response", () => {
+    // Replay of a live stall: the greeting response's stopped event was lost,
+    // pinning playback attribution and starving every scripted narration.
+    const { client, harness, latest } = createHarness(vi.fn(), vi.fn());
+    harness.status = "connected";
+    harness.handleServerEvent({
+      type: SERVER_EVENTS.RESPONSE_CREATED,
+      response: { id: "resp_greeting" },
+    });
+    harness.handleServerEvent({
+      type: SERVER_EVENTS.OUTPUT_AUDIO_BUFFER_STARTED,
+      response_id: "resp_greeting",
+    });
+    harness.handleServerEvent(responseDone("resp_greeting", "completed"));
+    harness.handleServerEvent({
+      type: SERVER_EVENTS.RESPONSE_CREATED,
+      response: { id: "resp_filler" },
+    });
+    harness.handleServerEvent(responseDone("resp_filler", "incomplete"));
+
+    // While attribution is pinned to the greeting, scripted audio is refused
+    // and the refusal is visible in the trace.
+    expect(() =>
+      client.requestNarration("Step one narration.", {
+        requestId: "req-1",
+        stepId: "s1",
+        cycle: 1,
+      }),
+    ).toThrow("Wait for the active response to finish");
+    expect(
+      latest().trace.some((entry) => entry.type === "narration.request_refused"),
+    ).toBe(true);
+
+    // The stopped event names the later response, but the single output
+    // buffer is now silent; attribution must clear for both responses.
+    harness.handleServerEvent({
+      type: SERVER_EVENTS.OUTPUT_AUDIO_BUFFER_STOPPED,
+      response_id: "resp_filler",
+    });
+    expect(latest().audioPlaybackActive).toBe(false);
+    expect(() =>
+      client.requestNarration("Step one narration.", {
+        requestId: "req-1",
+        stepId: "s1",
+        cycle: 1,
+      }),
+    ).not.toThrow();
+  });
+
   it("cancels a pending playback assumption when the student starts speaking", () => {
     vi.useFakeTimers();
     try {

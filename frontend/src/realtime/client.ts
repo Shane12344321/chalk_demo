@@ -375,6 +375,10 @@ export class RealtimeClient implements BoardContextPublisher {
       throw new Error("Connect the Realtime session before starting scripted audio.");
     }
     if (this.responseCoordinator.hasPurpose(purpose)) {
+      this.addLocalTrace("narration.request_refused", {
+        purpose,
+        reason: "purpose_active",
+      });
       this.emitSnapshot();
       throw new Error(`A ${purpose} response is already active.`);
     }
@@ -383,6 +387,13 @@ export class RealtimeClient implements BoardContextPublisher {
       this.playbackResponseId ||
       this.responseCoordinator.hasInFlight()
     ) {
+      this.addLocalTrace("narration.request_refused", {
+        purpose,
+        reason: "response_busy",
+        active: Boolean(this.activeResponseId),
+        playback: Boolean(this.playbackResponseId),
+        in_flight: this.responseCoordinator.hasInFlight(),
+      });
       this.emitSnapshot();
       throw new Error("Wait for the active response to finish before scripted audio.");
     }
@@ -610,9 +621,11 @@ export class RealtimeClient implements BoardContextPublisher {
       if (responseId && responseId === this.activeResponseId) {
         this.activeResponseId = undefined;
       }
-      if (!responseId || responseId === this.playbackResponseId) {
-        this.playbackResponseId = undefined;
-      }
+      // There is a single audio output buffer, so a stopped/cleared report
+      // means nothing is playing regardless of which response the event
+      // names. A lost stopped event for an earlier response must not pin
+      // playback attribution forever and starve scripted narration.
+      this.playbackResponseId = undefined;
       this.emitSnapshot();
       return;
     }
@@ -982,8 +995,8 @@ export class RealtimeClient implements BoardContextPublisher {
           ? { request_id: context.requestId, step_id: context.stepId, cycle: context.cycle }
           : {}),
         registered_at_ms: round(this.now() - this.startedAt),
-        stage: "registered",
-      },
+        stage: "registered" as ResponseDiagnosticStage,
+      } satisfies ResponseDiagnostic,
     ].slice(-32);
   }
 
@@ -1373,7 +1386,18 @@ export class RealtimeClient implements BoardContextPublisher {
 
   private addLocalTrace(
     type: string,
-    metadata: Pick<TraceEntry, "response_id" | "call_id" | "status" | "code"> = {},
+    metadata: Pick<
+      TraceEntry,
+      | "response_id"
+      | "call_id"
+      | "status"
+      | "code"
+      | "purpose"
+      | "reason"
+      | "active"
+      | "playback"
+      | "in_flight"
+    > = {},
   ): void {
     this.trace = appendBounded(
       this.trace,

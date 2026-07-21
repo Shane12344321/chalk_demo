@@ -60,7 +60,18 @@ export function createLocalTraceEntry(
   type: string,
   sequence: number,
   atMs: number,
-  metadata: Pick<TraceEntry, "response_id" | "call_id" | "status" | "code"> = {},
+  metadata: Pick<
+    TraceEntry,
+    | "response_id"
+    | "call_id"
+    | "status"
+    | "code"
+    | "purpose"
+    | "reason"
+    | "active"
+    | "playback"
+    | "in_flight"
+  > = {},
 ): TraceEntry {
   const entry: TraceEntry = {
     sequence,
@@ -72,6 +83,11 @@ export function createLocalTraceEntry(
   assign(entry, "call_id", metadata.call_id);
   assign(entry, "status", metadata.status);
   assign(entry, "code", metadata.code);
+  assign(entry, "purpose", metadata.purpose);
+  assign(entry, "reason", metadata.reason);
+  if (typeof metadata.active === "boolean") entry.active = metadata.active;
+  if (typeof metadata.playback === "boolean") entry.playback = metadata.playback;
+  if (typeof metadata.in_flight === "boolean") entry.in_flight = metadata.in_flight;
   return entry;
 }
 
@@ -164,6 +180,11 @@ function sanitizeTraceEntry(entry: TraceEntry, index: number): TraceEntry {
   assign(sanitized, "call_id", entry.call_id);
   assign(sanitized, "status", entry.status);
   assign(sanitized, "code", entry.code);
+  assign(sanitized, "purpose", entry.purpose);
+  assign(sanitized, "reason", entry.reason);
+  if (typeof entry.active === "boolean") sanitized.active = entry.active;
+  if (typeof entry.playback === "boolean") sanitized.playback = entry.playback;
+  if (typeof entry.in_flight === "boolean") sanitized.in_flight = entry.in_flight;
   copyTokenCount(sanitized, "total_tokens", entry.total_tokens);
   copyTokenCount(sanitized, "input_tokens", entry.input_tokens);
   copyTokenCount(sanitized, "output_tokens", entry.output_tokens);

@@ -1059,7 +1059,8 @@ def test_board_prompt_encodes_accumulated_whiteboard_layout() -> None:
     assert "one accumulated argument" in prompt
     assert "Prefer anchors over independent region placement" in prompt
     assert "do not add filler" in prompt
-    assert "Use `text` for short identities" in prompt
+    assert "MUST be an `equation` op written in real LaTeX" in prompt
+    assert "Labels must never pile up" in prompt
     assert '"op":"text","id":"result"' in prompt
     assert '"content":"f\'(1) = 2"' in prompt
 

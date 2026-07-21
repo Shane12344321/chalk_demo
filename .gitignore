@@ -36,6 +36,3 @@ artifacts/private/
 .DS_Store
 .idea/
 .vscode/
-
-# Local Claude Code user settings
-.claude/settings.local.json

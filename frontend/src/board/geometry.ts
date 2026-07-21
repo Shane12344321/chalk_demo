@@ -109,8 +109,83 @@ export class BoardGeometryStore {
     for (const id of this.cache.keys()) {
       if (!liveIds.has(id)) this.cache.delete(id);
     }
-    return { geometries, warnings };
+    return { geometries: declutterCanvasLabels(geometries), warnings };
   }
+}
+
+/**
+ * Per-op geometry resolves label collisions only inside a single diagram op,
+ * so standalone arrows, arcs, and points that converge on one vertex can
+ * stack their labels into an unreadable pile. This pass re-runs the same
+ * greedy placement across every op that shares a coordinate canvas. Cached
+ * geometry keeps the raw positions; the pass is pure per build.
+ */
+function declutterCanvasLabels(
+  geometries: readonly BoardGeometry[],
+): BoardGeometry[] {
+  const groups = new Map<string, number[]>();
+  geometries.forEach((geometry, index) => {
+    if (!geometry.canvasBox || geometry.labels.length === 0) return;
+    const { x, y, width, height } = geometry.canvasBox;
+    const key = `${x}:${y}:${width}:${height}`;
+    const members = groups.get(key);
+    if (members) members.push(index);
+    else groups.set(key, [index]);
+  });
+
+  const result = [...geometries];
+  for (const members of groups.values()) {
+    const movable = members.filter((index) => geometries[index].kind !== "diagram");
+    if (movable.length < 2 && (movable.length === 0 || members.length < 2)) continue;
+    const occupied: LayoutBox[] = [];
+    for (const index of members) {
+      const geometry = geometries[index];
+      if (geometry.kind === "diagram") {
+        occupied.push(...geometry.labels.map(labelBox));
+        occupied.push(...(geometry.inkBounds ?? []));
+      } else if (isThinBox(geometry.box)) {
+        occupied.push(geometry.box);
+      }
+    }
+    for (const index of movable) {
+      const geometry = geometries[index];
+      const canvas = geometry.canvasBox;
+      if (!canvas) continue;
+      const placed = geometry.labels.map((label) =>
+        placeLabelAvoiding(label, canvas, occupied),
+      );
+      occupied.push(...placed.map(labelBox));
+      if (placed.some((label, i) => label !== geometry.labels[i])) {
+        result[index] = { ...geometry, labels: placed };
+      }
+    }
+  }
+  return result;
+}
+
+function placeLabelAvoiding(
+  label: BoardLabel,
+  canvas: LayoutBox,
+  occupied: readonly LayoutBox[],
+): BoardLabel {
+  if (!label.autoPlace) return label;
+  const candidate = { ...label };
+  for (const [dx, dy] of labelPlacementOffsets()) {
+    candidate.x = label.x + dx;
+    candidate.y = label.y + dy;
+    clampLabelToCanvas(candidate, canvas);
+    if (!occupied.some((box) => boxesOverlap(labelBox(candidate), box))) {
+      return candidate.x === label.x && candidate.y === label.y
+        ? label
+        : candidate;
+    }
+  }
+  // Nothing fits: keep the authored position instead of exiling the label.
+  return label;
+}
+
+function isThinBox(box: LayoutBox): boolean {
+  return Math.min(box.width, box.height) <= 60;
 }
 
 function createGeometry(
@@ -286,7 +361,9 @@ function createGeometry(
         0,
         50,
       ),
-      labels: op.label ? [{ text: op.label, x: x + 16, y: y - 12 }] : [],
+      labels: op.label
+        ? [{ text: op.label, x: x + 16, y: y - 12, autoPlace: true }]
+        : [],
       manifestSummary: `point${op.label ? `: ${op.label}` : ""}`,
     };
   }
@@ -318,6 +395,7 @@ function createGeometry(
               x: center[0] + Math.cos(midpointRadians) * (radius + 24),
               y: center[1] + Math.sin(midpointRadians) * (radius + 24),
               anchor: "middle",
+              autoPlace: true,
             },
           ]
         : [],

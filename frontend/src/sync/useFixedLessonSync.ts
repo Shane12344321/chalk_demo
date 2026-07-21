@@ -19,6 +19,17 @@ import {
 
 const AUDIO_DRAIN_GUARD_MS = 260;
 const AUDIO_STOP_FINISH_MS = 400;
+// A refused narration request self-retries on a timer because nothing else is
+// guaranteed to change state again: the refusal can race a playback tail whose
+// settling emits no sync event, which previously froze the lesson silently.
+const NARRATION_RETRY_DELAY_MS = 600;
+const MAX_NARRATION_RETRIES = 20;
+
+// The base instructions tell the tutor to point students at Resume after an
+// interruption answer. Once the lesson completes there is no frozen step, so
+// the tutor must be retargeted or it directs students at a disabled button.
+export const LESSON_DONE_GUIDANCE =
+  "The lesson is complete; there is no frozen step, so never tell the student to use Resume. If they speak, answer briefly about the finished board and offer to replay the lesson or start a new topic.";
 
 interface UseFixedLessonSyncOptions {
   lesson: NormalizedLesson;
@@ -45,6 +56,7 @@ export function useFixedLessonSync({
   const [state, dispatch] = useReducer(fixedSyncReducer, EMPTY_SYNC_STATE);
   const stateRef = useRef(state);
   const narrationKeyRef = useRef<string>();
+  const narrationRetriesRef = useRef(0);
   const checkpointKeyRef = useRef<string>();
   const wasConnectedRef = useRef(false);
   const loadedRequestIdRef = useRef<string>();
@@ -58,6 +70,7 @@ export function useFixedLessonSync({
       .map((step) => step.id);
     if (loadedRequestIdRef.current !== requestId) {
       narrationKeyRef.current = undefined;
+      narrationRetriesRef.current = 0;
       checkpointKeyRef.current = undefined;
       loadedRequestIdRef.current = requestId;
       loadedStepIdsRef.current = stepIds;
@@ -117,14 +130,27 @@ export function useFixedLessonSync({
         await clientRef.current?.setInteractionGuidance(undefined);
         if (cancelled || stateRef.current.phase !== "TEACHING") return;
         clientRef.current?.requestNarration(step.script, context);
+        narrationRetriesRef.current = 0;
       } catch {
         narrationKeyRef.current = undefined;
+        if (narrationRetriesRef.current >= MAX_NARRATION_RETRIES) return;
+        narrationRetriesRef.current += 1;
+        window.setTimeout(() => {
+          dispatch({ type: "NARRATION_RETRY", requestId: context.requestId });
+        }, NARRATION_RETRY_DELAY_MS);
       }
     })();
     return () => {
       cancelled = true;
     };
   }, [clientRef, connectionStatus, lesson.steps, responseIdle, state]);
+
+  useEffect(() => {
+    if (state.phase !== "DONE" || connectionStatus !== "connected") return;
+    void clientRef.current
+      ?.setInteractionGuidance(LESSON_DONE_GUIDANCE)
+      .catch(() => undefined);
+  }, [clientRef, connectionStatus, state.phase]);
 
   useEffect(() => {
     if (state.phase !== "CHECKPOINT_ASKING") return;

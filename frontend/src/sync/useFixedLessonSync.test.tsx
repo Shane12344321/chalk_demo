@@ -3,11 +3,15 @@ import { describe, expect, it, vi } from "vitest";
 import projectileLesson from "../../../demo/cached_lessons/projectile-range.lesson.json";
 import { decodeLesson } from "../board/decode";
 import type { ConnectionStatus, RealtimeClient } from "../realtime";
-import { useFixedLessonSync } from "./useFixedLessonSync";
+import { LESSON_DONE_GUIDANCE, useFixedLessonSync } from "./useFixedLessonSync";
 
 const lesson = decodeLesson(projectileLesson).lesson!;
 
-function setup(status: ConnectionStatus = "connected", responseIdle = true) {
+function setup(
+  status: ConnectionStatus = "connected",
+  responseIdle = true,
+  lessonOverride = lesson,
+) {
   const requestNarration = vi.fn();
   const requestCheckpointPrompt = vi.fn();
   const expectAutomaticResponse = vi.fn();
@@ -25,7 +29,7 @@ function setup(status: ConnectionStatus = "connected", responseIdle = true) {
   const hook = renderHook(
     ({ connectionStatus, idle }) =>
       useFixedLessonSync({
-        lesson,
+        lesson: lessonOverride,
         clientRef,
         connectionStatus,
         responseIdle: idle,
@@ -70,6 +74,40 @@ describe("fixed lesson synchronization effects", () => {
     rerender({ connectionStatus: "connected", idle: false });
     rerender({ connectionStatus: "connected", idle: true });
     await waitFor(() => expect(requestNarration).toHaveBeenCalledTimes(2));
+  });
+
+  it("self-retries a refused narration without waiting for another state change", async () => {
+    vi.useFakeTimers();
+    try {
+      const { result, requestNarration } = setup();
+      requestNarration
+        .mockImplementationOnce(() => {
+          throw new Error("Wait for the active response to finish before scripted audio.");
+        })
+        .mockImplementationOnce(() => {
+          throw new Error("Wait for the active response to finish before scripted audio.");
+        });
+      act(() => result.current.start());
+      await act(async () => {
+        await Promise.resolve();
+      });
+      expect(requestNarration).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        vi.advanceTimersByTime(600);
+        await Promise.resolve();
+      });
+      expect(requestNarration).toHaveBeenCalledTimes(2);
+
+      await act(async () => {
+        vi.advanceTimersByTime(600);
+        await Promise.resolve();
+      });
+      expect(requestNarration).toHaveBeenCalledTimes(3);
+      expect(result.current.state.phase).toBe("TEACHING");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("resets an in-progress lesson when its connected session ends", () => {
@@ -134,6 +172,37 @@ describe("fixed lesson synchronization effects", () => {
       }),
     );
     expect(result.current.state.phase).toBe("TEACHING");
+  });
+
+  it("retargets tutor guidance away from Resume when the lesson completes", async () => {
+    vi.useFakeTimers();
+    try {
+      const singleStep = {
+        ...lesson,
+        steps: [{ ...lesson.steps[0], checkpoint: null }],
+      };
+      const { result, setInteractionGuidance } = setup("connected", true, singleStep);
+      act(() => result.current.start());
+      const state = result.current.state;
+      const context = {
+        requestId: state.requestId,
+        stepId: state.stepIds[state.currentStepIndex],
+        cycle: state.cycle,
+      };
+      act(() => result.current.onSemanticEvent({ type: "narration.activity", context }));
+      act(() =>
+        result.current.onSemanticEvent({ type: "narration.generation_done", context }),
+      );
+      act(() =>
+        result.current.onSemanticEvent({ type: "narration.playback_stopped", context }),
+      );
+      act(() => vi.advanceTimersByTime(600));
+
+      expect(result.current.state.phase).toBe("DONE");
+      expect(setInteractionGuidance).toHaveBeenCalledWith(LESSON_DONE_GUIDANCE);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("maps transcript character counts to a pacing hint without starting ink", () => {

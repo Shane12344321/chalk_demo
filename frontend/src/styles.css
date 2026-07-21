@@ -638,8 +638,8 @@ select:focus {
 .response-ledger-row dl { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin: 8px 0 0; }
 .response-ledger-row dl div { min-width: 0; }
 .response-ledger-row dt { color: var(--ink-faint); font-size: 0.72rem; }
-.response-ledger-row dd { margin: 2px 0 0; color: var(--ink); font-family: var(--mono); font-size: 0.78rem; overflow-wrap: anywhere; }
-.response-diagnosis { margin: 5px 0 0; color: var(--ink-muted); font-size: 0.82rem; }
+.response-ledger-row dd { margin: 2px 0 0; color: var(--ink); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.78rem; overflow-wrap: anywhere; }
+.response-diagnosis { margin: 5px 0 0; color: var(--ink-faint); font-size: 0.82rem; }
 .response-ledger-row small { display: block; margin-top: 8px; color: var(--ink-faint); }
 .response-stage-failed, .response-stage-timed_out { border-left: 3px solid var(--danger); padding-left: 10px; }
 .direction { font-size: 0.65rem; font-weight: 800; text-transform: uppercase; }

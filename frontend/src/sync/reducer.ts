@@ -72,7 +72,8 @@ export type FixedSyncEvent =
   | ({ type: "CHECKPOINT_FEEDBACK_DRAIN_ELAPSED" } & CorrelatedEvent)
   | ({ type: "CHECKPOINT_FAILED" } & CorrelatedEvent)
   | ({ type: "RESUME" } & CorrelatedEvent)
-  | { type: "RESET"; requestId: string };
+  | { type: "RESET"; requestId: string }
+  | { type: "NARRATION_RETRY"; requestId: string };
 
 export const EMPTY_SYNC_STATE: FixedSyncState = {
   phase: "IDLE",
@@ -153,6 +154,13 @@ export function fixedSyncReducer(
       return teachingState(completed, state.currentStepIndex + 1, state.cycle + 1, 0);
     }
     return finishLesson(completed);
+  }
+  if (event.type === "NARRATION_RETRY") {
+    // Identity-only change: re-runs the narration effect after a refused
+    // request without touching lesson progress.
+    return event.requestId === state.requestId && state.phase === "TEACHING"
+      ? { ...state }
+      : ignored(state);
   }
   if (event.type === "RESET") {
     return event.requestId === state.requestId

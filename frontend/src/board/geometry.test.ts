@@ -53,7 +53,45 @@ describe("seeded rough geometry", () => {
     expect(incident.paths.length).toBeGreaterThan(2);
     expect(hit.paths.length).toBeGreaterThan(0);
     expect(theta.paths.length).toBeGreaterThan(0);
-    expect(theta.labels[0].text).toBe("theta");
+    expect(theta.labels[0].text).toBe("θ");
+  });
+
+  it("keeps labels from ops converging on one canvas vertex from overlapping", () => {
+    const physics = decodeLesson(physicsDiagramLesson()).lesson!;
+    const result = new BoardGeometryStore().build(layoutSteps(physics.steps));
+    const labels = result.geometries
+      .filter((geometry) => geometry.canvasBox)
+      .flatMap((geometry) => geometry.labels);
+    expect(labels.length).toBeGreaterThanOrEqual(4);
+    const boxes = labels.map((label) => {
+      const fontSize = label.fontSize ?? 31;
+      const width = Math.max(fontSize * 0.65, label.text.length * fontSize * 0.58);
+      const x = label.anchor === "end"
+        ? label.x - width
+        : label.anchor === "middle"
+          ? label.x - width / 2
+          : label.x;
+      return { x, y: label.y - fontSize, width, height: fontSize * 1.25 };
+    });
+    for (let a = 0; a < boxes.length; a += 1) {
+      for (let b = a + 1; b < boxes.length; b += 1) {
+        const overlaps =
+          boxes[a].x < boxes[b].x + boxes[b].width &&
+          boxes[b].x < boxes[a].x + boxes[a].width &&
+          boxes[a].y < boxes[b].y + boxes[b].height &&
+          boxes[b].y < boxes[a].y + boxes[a].height;
+        expect(overlaps, `labels "${labels[a].text}" and "${labels[b].text}" overlap`).toBe(false);
+      }
+    }
+  });
+
+  it("declutters labels identically across independent stores", () => {
+    const physics = decodeLesson(physicsDiagramLesson()).lesson!;
+    const first = new BoardGeometryStore().build(layoutSteps(physics.steps));
+    const second = new BoardGeometryStore().build(layoutSteps(physics.steps));
+    expect(first.geometries.map(({ labels }) => labels)).toEqual(
+      second.geometries.map(({ labels }) => labels),
+    );
   });
 
   it("renders a composite diagram as sequential smooth, bounded ink groups", () => {
@@ -63,7 +101,7 @@ describe("seeded rough geometry", () => {
     expect(result.geometries).toHaveLength(1);
     const geometry = result.geometries[0];
     expect(geometry.kind).toBe("diagram");
-    expect(geometry.labels.map(({ text }) => text)).toEqual(["support", "cord", "mass", "theta", "mg"]);
+    expect(geometry.labels.map(({ text }) => text)).toEqual(["support", "cord", "mass", "θ", "mg"]);
     expect(new Set(geometry.paths.map(({ revealGroup }) => revealGroup))).toEqual(new Set([0, 1, 2, 3, 4]));
     expect(geometry.paths.some(({ d }) => d.includes("C"))).toBe(true);
     expect(geometry.box.width).toBeLessThan(1600);

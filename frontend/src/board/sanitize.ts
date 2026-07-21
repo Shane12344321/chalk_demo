@@ -1,3 +1,5 @@
+import { substituteGreekNames } from "./mathGlyphs";
+
 export type SanitizationCode =
   | "trimmed_outer_whitespace"
   | "normalized_power_operator"
@@ -84,11 +86,13 @@ export function sanitizeStep(value: unknown): SanitizationResult {
         recorder.add("normalized_power_operator");
       }
       sanitizeNormalizedPoints(op, recorder);
+      substituteMathGlyphs(op);
       if (Array.isArray(op.primitives)) {
         for (const primitive of op.primitives) {
           if (!isRecord(primitive)) continue;
           trimMappingStrings(primitive, recorder);
           sanitizeNormalizedPoints(primitive, recorder);
+          substituteMathGlyphs(primitive);
         }
       }
     }
@@ -99,6 +103,17 @@ export function sanitizeStep(value: unknown): SanitizationResult {
     corrections: recorder.corrections,
     correctionCount: recorder.count,
   };
+}
+
+// Cosmetic glyph normalization for board-visible prose: ASCII Greek names in
+// text content and labels become their glyphs. Deliberately not recorded as a
+// correction (it is a rendering preference, not an authoring error) and never
+// applied to `latex`, which KaTeX interprets.
+function substituteMathGlyphs(value: Record<string, unknown>): void {
+  for (const key of ["content", "label"] as const) {
+    const current = value[key];
+    if (typeof current === "string") value[key] = substituteGreekNames(current);
+  }
 }
 
 function trimMappingStrings(value: Record<string, unknown>, recorder: Recorder): void {

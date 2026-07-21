@@ -106,6 +106,6 @@ describe("Board", () => {
     expect(view.container.querySelectorAll('[data-element-id="normal"] path').length).toBeGreaterThan(4);
     expect(view.container.querySelectorAll('[data-element-id="incident"] path').length).toBeGreaterThan(2);
     expect(view.container.querySelector('[data-element-id="hit"]')).not.toBeNull();
-    expect(view.container.querySelector('[data-element-id="theta"]')?.textContent).toContain("theta");
+    expect(view.container.querySelector('[data-element-id="theta"]')?.textContent).toContain("θ");
   });
 });

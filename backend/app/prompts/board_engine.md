@@ -42,7 +42,9 @@ Spatial narrative:
 - Reserve regions before drawing: put the main diagram or graph on one side and its short explanation on the other. Do not mix `left`, `right`, or `full` with grid regions that occupy the same space.
 - Reuse marks this lesson has already drawn. Do not restate a title or definition in a new region when a short anchored conclusion will continue the argument.
 - Use space coherently, but do not add filler or try to make the board artificially full. The final board should read in teaching order even with narration muted.
-- Use `text` for short identities and labels such as `f'(1) = 2`, `v = 0`, or `slope = rise/run`. Use `equation` only when structured LaTeX is genuinely needed, such as fractions, roots, sums, or multi-part expressions.
+- Use `text` only for plain words and simple identities that read cleanly as typed prose, such as `f'(1) = 2` or `v = 0`. Any expression with a Greek letter, subscript, superscript, fraction, root, or trig function MUST be an `equation` op written in real LaTeX — `\sin(\theta_c) = \frac{n_2}{n_1}`, never ASCII spellings like `sin(theta_c) = n_2 / n_1` in a `text` op. Never write underscores or `theta`-style names in `text` content.
+- Short `label` fields on arrows, lines, points, and angle arcs render as plain handwriting, not LaTeX: write Greek letters directly as glyphs there, such as `θ_c`, not `theta_c` or `\theta_c`.
+- Labels must never pile up. When several arrows or arcs meet at one vertex, label each ray near its far end, keep labels clear of the vertex, and prefer one short word per label; drop a label entirely before letting two overlap.
 - Introduce axes before curves. Keep sketches simple enough to read while animated.
 
 Input:
@@ -59,7 +61,7 @@ Worked example — an opening step whose sketch uses y-down coordinates (the arc
 
 Worked example — an optics diagram accumulated on one shared canvas:
 {"id":"s1","script":"The horizontal boundary and dashed normal establish one shared optics diagram.","ops":[{"op":"text","id":"title","region":"A1","content":"Total internal reflection"},{"op":"diagram","id":"optics","region":"right","primitives":[{"kind":"line","points":[[0.08,0.55],[0.92,0.55]],"stroke":"solid","label":"interface"},{"kind":"line","points":[[0.5,0.12],[0.5,0.92]],"stroke":"dashed","label":"normal"}]}],"checkpoint":null}
-{"id":"s2","script":"The incident ray reaches the boundary and reflects back into the denser medium.","ops":[{"op":"arrow","id":"incident","canvas_id":"optics","from":[0.18,0.86],"to":[0.5,0.55],"stroke":"solid","label":"incident"},{"op":"arrow","id":"reflected","canvas_id":"optics","from":[0.5,0.55],"to":[0.82,0.86],"stroke":"solid","label":"reflected"},{"op":"angle_arc","id":"theta","canvas_id":"optics","center":[0.5,0.55],"radius":0.16,"start_deg":90,"end_deg":136,"stroke":"solid","label":"theta"}],"checkpoint":null}
+{"id":"s2","script":"The incident ray reaches the boundary and reflects back into the denser medium.","ops":[{"op":"arrow","id":"incident","canvas_id":"optics","from":[0.18,0.86],"to":[0.5,0.55],"stroke":"solid","label":"incident"},{"op":"arrow","id":"reflected","canvas_id":"optics","from":[0.5,0.55],"to":[0.82,0.86],"stroke":"solid","label":"reflected"},{"op":"angle_arc","id":"theta","canvas_id":"optics","center":[0.5,0.55],"radius":0.16,"start_deg":90,"end_deg":136,"stroke":"solid","label":"θ_c"}],"checkpoint":null}
 
 Worked example — generic aligned working with schema-1.2 relations (this is not topic-specific layout):
 {"id":"s1","script":"Read these three transformations as one vertically aligned argument.","ops":[{"op":"text","id":"work1","region":"left","content":"starting expression"},{"op":"text","id":"work2","region":"A2","content":"apply one operation"},{"op":"text","id":"work3","region":"A3","content":"simplified result"}],"layout":[{"kind":"stack","ids":["work1","work2","work3"],"direction":"vertical","align":"start","gap":0.035}],"checkpoint":null}
