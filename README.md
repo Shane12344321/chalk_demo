@@ -3,9 +3,7 @@
 CHALK is a localhost hackathon prototype for a math and physics tutor that talks while drawing and stops when the student interrupts. M1 proves the browser-to-OpenAI Realtime WebRTC voice foundation. M2 adds the deterministic SVG whiteboard and concurrent voice/ink synchronization. The accepted cached M4 slice adds visible-board grounding, turn-gated speech, and a tutor-initiated checkpoint. M3 now adds bounded topic-driven lesson generation through a validated NDJSON stream.
 
 
-## Current status
 
-M1, M2, and M3 are complete, and the cached-interaction M4 slice has passed. Broader M4 deterministic implementation now includes committed-element grounding, four instant local deixis overlays, a bounded stale-safe annotation overlay path, three offline recording caches, and manifest acknowledgement timing/fingerprint evidence. Its three-loop live rehearsal gate is still pending. M3's approved accumulated-whiteboard v2 Luna/`none` evidence completed all ten fixed topics with 39 accepted steps, zero repairs/drops/retries/errors, zero renderer crashes, and exactly 8/10 human layout passes. Unit circle and standing waves retain explicit live-generation collision failures. A separate connected product run measured 1.36 seconds to the first validated step and 2.72 seconds to first visible ink, passing the six-second target. The read-only verifier accepts the redacted package at `artifacts/evidence/m3-luna-v2-batch-20260717-0635/`. Automated checks never call the live API. See `PROGRESS.md` for exact evidence and remaining M4 work.
 
 ## How CHALK was built: Codex and GPT-5.6
 
@@ -218,6 +216,11 @@ Expected event names from current documentation are only a checklist. The live t
 - Diagnostics retain event metadata and timing only. Secret values, authorization headers, audio, image data URLs, and raw student content must be removed.
 - The browser persists a random UUID for the local client. The backend sends only `SHA-256(salt + ":" + UUID)` as `OpenAI-Safety-Identifier`; the raw UUID is never sent upstream to OpenAI and must not be derived from a name, email address, IP address, or utterance. Clearing site data rotates the browser UUID.
 - Localhost binding is a scope boundary, not production security. There is no authentication or multi-user isolation.
+
+## Current status
+
+M1, M2, and M3 are complete, and the cached-interaction M4 slice has passed. Broader M4 deterministic implementation now includes committed-element grounding, four instant local deixis overlays, a bounded stale-safe annotation overlay path, three offline recording caches, and manifest acknowledgement timing/fingerprint evidence. Its three-loop live rehearsal gate is still pending. M3's approved accumulated-whiteboard v2 Luna/`none` evidence completed all ten fixed topics with 39 accepted steps, zero repairs/drops/retries/errors, zero renderer crashes, and exactly 8/10 human layout passes. Unit circle and standing waves retain explicit live-generation collision failures. A separate connected product run measured 1.36 seconds to the first validated step and 2.72 seconds to first visible ink, passing the six-second target. The read-only verifier accepts the redacted package at `artifacts/evidence/m3-luna-v2-batch-20260717-0635/`. Automated checks never call the live API. See `PROGRESS.md` for exact evidence and remaining M4 work.
+
 
 ## Project guidance
 
