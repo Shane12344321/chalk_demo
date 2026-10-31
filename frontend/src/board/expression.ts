@@ -1,5 +1,4 @@
 import { parse, type MathNode } from "mathjs/number";
-import type { AxesOp, CurveOp } from "./lesson.generated";
 
 const ALLOWED_FUNCTIONS = new Set([
   "sin",
@@ -10,7 +9,9 @@ const ALLOWED_FUNCTIONS = new Set([
   "sqrt",
   "abs",
 ]);
-const ALLOWED_SYMBOLS = new Set(["x", "pi", "e"]);
+/** The one free variable an expression may use: `x` for y(x), `t` for x(t)/y(t), `theta` for r(θ). */
+export type ExpressionVariable = "x" | "t" | "theta";
+const CONSTANT_SYMBOLS = ["pi", "e"] as const;
 const ALLOWED_OPERATORS = new Set(["+", "-", "*", "/", "^"]);
 const EXPRESSION_CHARACTERS = /^[0-9a-zA-Z_+\-*/^().\s]+$/;
 
@@ -28,33 +29,18 @@ export interface CompiledCurve {
   sample: (domain: readonly [number, number], sampleCount?: number) => Array<[number, number]>;
 }
 
-export type CurvePoint = [number, number];
-
-export function sampleVisibleCurveSegments(
-  curve: Pick<CurveOp, "expr" | "domain">,
-  axes: Pick<AxesOp, "x" | "y">,
-): CurvePoint[][] {
-  const domain = curve.domain ?? [axes.x.min, axes.x.max];
-  const samples = compileSafeCurve(curve.expr).sample(domain, 121);
-  const segments: CurvePoint[][] = [];
-  let segment: CurvePoint[] = [];
-  const flush = () => {
-    if (segment.length >= 2) segments.push(segment);
-    segment = [];
-  };
-  for (const point of samples) {
-    const [x, y] = point;
-    if (x >= axes.x.min && x <= axes.x.max && y >= axes.y.min && y <= axes.y.max) {
-      segment.push(point);
-    } else {
-      flush();
-    }
-  }
-  flush();
-  return segments;
+export function compileSafeCurve(expression: string): CompiledCurve {
+  return compileSafeExpression(expression, "x");
 }
 
-export function compileSafeCurve(expression: string): CompiledCurve {
+/**
+ * Compile an allowlisted expression in exactly one free variable. Sampling
+ * returns `[variable, value]` pairs; callers decide what the pair means.
+ */
+export function compileSafeExpression(
+  expression: string,
+  variable: ExpressionVariable,
+): CompiledCurve {
   if (
     expression.length === 0 ||
     expression.length > 120 ||
@@ -64,11 +50,11 @@ export function compileSafeCurve(expression: string): CompiledCurve {
   }
 
   const node = parse(expression);
-  inspectNode(node as InspectableNode, 0);
+  inspectNode(node as InspectableNode, 0, new Set([variable, ...CONSTANT_SYMBOLS]));
   const compiled = node.compile();
 
   const evaluate = (x: number): number => {
-    const value: unknown = compiled.evaluate({ x });
+    const value: unknown = compiled.evaluate({ [variable]: x });
     if (typeof value !== "number" || !Number.isFinite(value)) {
       throw new Error("Expression produced a non-finite number.");
     }
@@ -105,7 +91,11 @@ export function compileSafeCurve(expression: string): CompiledCurve {
   };
 }
 
-function inspectNode(node: InspectableNode, depth: number): void {
+function inspectNode(
+  node: InspectableNode,
+  depth: number,
+  allowedSymbols: ReadonlySet<string>,
+): void {
   if (depth > 24) throw new Error("Expression nesting exceeds the allowed budget.");
 
   switch (node.type) {
@@ -115,20 +105,20 @@ function inspectNode(node: InspectableNode, depth: number): void {
       }
       return;
     case "SymbolNode":
-      if (!node.name || !ALLOWED_SYMBOLS.has(node.name)) {
+      if (!node.name || !allowedSymbols.has(node.name)) {
         throw new Error(`Unsupported symbol: ${node.name ?? "unknown"}.`);
       }
       return;
     case "ParenthesisNode":
       if (!node.content) throw new Error("Malformed parenthesized expression.");
-      inspectNode(node.content as InspectableNode, depth + 1);
+      inspectNode(node.content as InspectableNode, depth + 1, allowedSymbols);
       return;
     case "OperatorNode":
       if (!node.op || !ALLOWED_OPERATORS.has(node.op) || !node.args) {
         throw new Error(`Unsupported operator: ${node.op ?? "unknown"}.`);
       }
       for (const argument of node.args) {
-        inspectNode(argument as InspectableNode, depth + 1);
+        inspectNode(argument as InspectableNode, depth + 1, allowedSymbols);
       }
       return;
     case "FunctionNode": {
@@ -141,7 +131,7 @@ function inspectNode(node: InspectableNode, depth: number): void {
       ) {
         throw new Error("Only allowlisted one-argument functions are allowed.");
       }
-      inspectNode(node.args[0] as InspectableNode, depth + 1);
+      inspectNode(node.args[0] as InspectableNode, depth + 1, allowedSymbols);
       return;
     }
     default:

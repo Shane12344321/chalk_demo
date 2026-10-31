@@ -15,6 +15,7 @@ from jsonschema import Draft7Validator
 from referencing import Registry, Resource
 
 from app.expression_runtime import CurveSamplingError, sample_curve
+from app.figure_validation import FigureIssue, FigureState, validate_figure_op
 from app.latex_lint import lint_equation_latex
 from app.lesson_sanitizer import SanitizationResult, sanitize_step
 
@@ -53,9 +54,10 @@ class LessonValidationState:
     accepted_step_ids: set[str] = field(default_factory=set)
     accepted_steps: int = 0
     checkpoint_accepted: bool = False
+    figures: FigureState = field(default_factory=FigureState)
 
     def inventory(self) -> list[str]:
-        return sorted(self.accepted_ids)
+        return sorted(set(self.accepted_ids) | set(self.figures.marks))
 
 
 @dataclass(frozen=True)
@@ -92,6 +94,14 @@ def step_validator() -> Draft7Validator:
 
 
 @lru_cache(maxsize=1)
+def checkpoint_validator() -> Draft7Validator:
+    schema = lesson_schema()
+    return Draft7Validator(
+        {"$schema": schema["$schema"], "$ref": "#/$defs/checkpoint", "$defs": schema["$defs"]}
+    )
+
+
+@lru_cache(maxsize=1)
 def envelope_validator() -> Draft7Validator:
     lesson = lesson_schema()
     stream = stream_schema()
@@ -119,6 +129,15 @@ def validate_step_with_sanitization(value: Any, state: LessonValidationState) ->
 
     sanitization = sanitize_step(value)
     value = sanitization.value
+    # A checkpoint is optional. One that breaks its schema is dropped and
+    # recorded: a repair round trip almost always dropped it too.
+    if (
+        isinstance(value, dict)
+        and value.get("checkpoint") is not None
+        and _schema_issues(checkpoint_validator(), value["checkpoint"])
+    ):
+        value = {**value, "checkpoint": None}
+        sanitization = sanitization.with_correction("dropped_invalid_checkpoint")
 
     issues = _schema_issues(step_validator(), value)
     if issues:
@@ -142,15 +161,23 @@ def validate_step_with_sanitization(value: Any, state: LessonValidationState) ->
     if script_words == 0:
         semantic_issues.append("script has no spoken words")
     if normalized["checkpoint"] is not None and state.checkpoint_accepted:
-        semantic_issues.append("lesson checkpoint budget exceeded; set checkpoint to null")
+        # A lesson has one checkpoint. A later one is dropped here, which is
+        # all a repair round trip would ask the model to do.
+        normalized["checkpoint"] = None
+        sanitization = sanitization.with_correction("dropped_extra_checkpoint")
 
     visible_types = dict(state.accepted_ids)
     pending_types: dict[str, str] = {}
     pending_axes: dict[str, dict[str, Any]] = {}
+    pending_figures = FigureState(
+        roots=dict(state.figures.roots),
+        windows=dict(state.figures.windows),
+        marks=dict(state.figures.marks),
+    )
     for index, op in enumerate(normalized["ops"]):
         op_id = op["id"]
         op_type = op["op"]
-        if op_id in visible_types or op_id in pending_types:
+        if op_id in visible_types or op_id in pending_types or op_id in pending_figures.marks:
             semantic_issues.append(f"op {index} has a duplicate element id")
             continue
 
@@ -244,6 +271,18 @@ def validate_step_with_sanitization(value: Any, state: LessonValidationState) ->
         elif op_type == "equation":
             for issue in lint_equation_latex(op["latex"]):
                 semantic_issues.append(f"op {index} {issue}")
+        elif op_type == "figure":
+            try:
+                figure = validate_figure_op(
+                    op, pending_figures, set(visible_types) | set(pending_types)
+                )
+            except FigureIssue as issue:
+                semantic_issues.append(f"op {index} {issue}")
+            else:
+                pending_figures.roots[op_id] = figure.root
+                if "frame" in op:
+                    pending_figures.windows[op_id] = figure.window
+                pending_figures.marks.update(figure.marks)
 
         pending_types[op_id] = op_type
 
@@ -251,7 +290,10 @@ def validate_step_with_sanitization(value: Any, state: LessonValidationState) ->
     movable_ids = {
         op["id"]
         for op in normalized["ops"]
-        if op["op"] != "curve" and "canvas_id" not in op and "construct" not in op
+        if op["op"] != "curve"
+        and "canvas_id" not in op
+        and "construct" not in op
+        and "on" not in op
     }
     for relation_index, relation in enumerate(normalized.get("layout", [])):
         moving_ids = [relation["id"]] if relation["kind"] == "place" else relation["ids"]
@@ -279,6 +321,7 @@ def validate_step_with_sanitization(value: Any, state: LessonValidationState) ->
 
     state.accepted_ids.update(pending_types)
     state.accepted_axes.update(pending_axes)
+    state.figures = pending_figures
     state.accepted_step_ids.add(step_id)
     state.accepted_steps += 1
     if normalized["checkpoint"] is not None:
@@ -351,8 +394,8 @@ def validate_envelope(value: Any) -> None:
         raise ValueError("invalid CHALK lesson stream envelope: " + "; ".join(issues))
 
 
-def validate_curve_expression(expression: str) -> None:
-    """Parse the CHALK expression subset without evaluating model output."""
+def validate_curve_expression(expression: str, variable: str = "x") -> None:
+    """Parse the CHALK expression subset (one free variable) without evaluating it."""
 
     try:
         tree = ast.parse(expression.replace("^", "**"), mode="eval")
@@ -377,7 +420,8 @@ def validate_curve_expression(expression: str) -> None:
         if isinstance(node, ALLOWED_BINARY_OPERATORS + ALLOWED_UNARY_OPERATORS):
             continue
         if isinstance(node, ast.Name):
-            if node.id not in ALLOWED_NAMES and node.id not in ALLOWED_FUNCTIONS:
+            allowed_names = (ALLOWED_NAMES - {"x"}) | {variable}
+            if node.id not in allowed_names and node.id not in ALLOWED_FUNCTIONS:
                 raise ValueError("name is not allowed")
             continue
         if isinstance(node, ast.Call):

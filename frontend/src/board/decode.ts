@@ -1,4 +1,5 @@
-import { sampleVisibleCurveSegments } from "./expression";
+import { createFigureState, validateFigureOp, type FigureState } from "./figureValidation";
+import { sampleVisibleCurveSegments } from "./scene/sample";
 import { renderSafeLatex } from "./latex";
 import type {
   Checkpoint,
@@ -24,8 +25,11 @@ export interface NormalizedStep {
   checkpoint: Checkpoint | null;
 }
 
+export type SchemaVersion = "1.0" | "1.1" | "1.2" | "1.3" | "1.4" | "1.5";
+const SCHEMA_VERSIONS: readonly string[] = ["1.0", "1.1", "1.2", "1.3", "1.4", "1.5"];
+
 export interface NormalizedLesson {
-  schemaVersion: "1.0" | "1.1" | "1.2" | "1.3" | "1.4";
+  schemaVersion: SchemaVersion;
   title: string;
   steps: NormalizedStep[];
 }
@@ -54,6 +58,8 @@ export interface DecodeResult {
 export interface DecodeContext {
   acceptedIds: Map<string, LessonOp>;
   acceptedStepIds: Set<string>;
+  /** Schema-1.5 figure frames and the mark IDs they define. */
+  figures: FigureState;
 }
 
 export interface DecodeStepResult {
@@ -62,7 +68,7 @@ export interface DecodeStepResult {
 }
 
 export function createDecodeContext(): DecodeContext {
-  return { acceptedIds: new Map(), acceptedStepIds: new Set() };
+  return { acceptedIds: new Map(), acceptedStepIds: new Set(), figures: createFigureState() };
 }
 
 export function decodeStep(rawStep: unknown, context: DecodeContext): DecodeStepResult {
@@ -117,10 +123,22 @@ export function decodeStep(rawStep: unknown, context: DecodeContext): DecodeStep
       );
       continue;
     }
-    const issue = validateSemanticOp(rawOp, context.acceptedIds, acceptedBeforeStepTypes);
+    const issue = context.figures.marks.has(rawOp.id)
+      ? { code: "duplicate_id" as const, detail: `Element ID ${rawOp.id} is already a figure mark.` }
+      : validateSemanticOp(rawOp, context.acceptedIds, acceptedBeforeStepTypes);
     if (issue) {
       warnings.push(warning(issue.code, issue.detail, stepId, rawOp.id));
       continue;
+    }
+    if (rawOp.op === "figure") {
+      const figure = validateFigureOp(rawOp, context.figures, new Set(context.acceptedIds.keys()));
+      if ("code" in figure) {
+        warnings.push(warning(figure.code, figure.detail, stepId, rawOp.id));
+        continue;
+      }
+      context.figures.roots.set(rawOp.id, figure.root);
+      if ("frame" in rawOp) context.figures.windows.set(rawOp.id, figure.window);
+      for (const [id, info] of figure.marks) context.figures.marks.set(id, info);
     }
     context.acceptedIds.set(rawOp.id, rawOp);
     ops.push(rawOp);
@@ -154,7 +172,7 @@ export function decodeLesson(value: unknown): DecodeResult {
   const warnings: LessonWarning[] = [];
   if (
     !isRecord(value) ||
-    !["1.0", "1.1", "1.2", "1.3", "1.4"].includes(String(value.schema_version))
+    !SCHEMA_VERSIONS.includes(String(value.schema_version))
   ) {
     return { warnings: [warning("invalid_lesson", "Unsupported or missing schema version.")] };
   }
@@ -183,7 +201,7 @@ export function decodeLesson(value: unknown): DecodeResult {
   }
   return {
     lesson: {
-      schemaVersion: value.schema_version as "1.0" | "1.1" | "1.2" | "1.3" | "1.4",
+      schemaVersion: value.schema_version as SchemaVersion,
       title: value.title,
       steps,
     },

@@ -1,6 +1,7 @@
 """FastAPI application factory for CHALK."""
 
 import asyncio
+import logging
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -21,9 +22,21 @@ from app.scratch import router as scratch_router
 from app.sessions import router
 
 
+def _configure_app_logging() -> None:
+    """Show the content-free `app.*` INFO logs; uvicorn only configures its own loggers."""
+
+    app_logger = logging.getLogger("app")
+    if not app_logger.handlers:
+        handler = logging.StreamHandler()
+        handler.setFormatter(logging.Formatter("%(levelname)s:     %(name)s %(message)s"))
+        app_logger.addHandler(handler)
+        app_logger.setLevel(logging.INFO)
+
+
 def create_app(settings: Settings | None = None) -> FastAPI:
     """Create an app with one explicit settings snapshot."""
 
+    _configure_app_logging()
     resolved_settings = settings or get_settings()
     application = FastAPI(
         title="CHALK backend",

@@ -1,0 +1,19 @@
+{
+  "schema": "chalk.drawing-suite-quality.v1",
+  "source": "frontend/gallery.html?dir=artifacts/evidence/suite40-v4-sol-20261019/ (production Board, boardQuality.ts with figure containment), 2026-10-19",
+  "boards": 40,
+  "clean": 31,
+  "issues": { "overlap": 9, "clipped_equation": 0, "outside_board": 1, "small_text": 0, "short_last_line": 0 },
+  "mean_board_coverage": 0.239,
+  "dirty": {
+    "geo-pythagoras": "length overlaps hyp (30%)",
+    "geo-similar": "triangles overlaps lengths (51%)",
+    "mech-incline": "forces overlaps components (19%); components overlaps motion (33%)",
+    "mech-torque": "bar overlaps turn_marks (14%)",
+    "prob-tree": "tree overlaps branches (27%)",
+    "trig-inscribed": "circlefig overlaps central (39%)",
+    "trig-radians": "circlefig overlaps values (80%)",
+    "wave-standing": "string overlaps nodes (21%)",
+    "wave-superposition": "opposing extends 9.4px beyond the board"
+  }
+}

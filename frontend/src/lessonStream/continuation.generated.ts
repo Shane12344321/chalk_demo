@@ -6,7 +6,7 @@
 export type LessonContinuationContract = LessonContinuationRequest | LessonContinuationResponse;
 export type RequestId = string;
 export type LessonOp =
-  TextOp | EquationOp | SketchOp | AxesOp | CurveOp | DiagramOp | LineOp | ArrowOp | PointOp | AngleArcOp;
+  TextOp | EquationOp | SketchOp | AxesOp | CurveOp | DiagramOp | LineOp | ArrowOp | PointOp | AngleArcOp | FigureOp;
 export type TextOp = TextRegionOp | TextAnchorOp;
 export type EquationOp = EquationRegionOp | EquationAnchorOp;
 /**
@@ -39,13 +39,68 @@ export type PointOp = PointRegionOp | PointCanvasOp | PointConstructionOp;
 export type PointConstruction =
   AlongConstruction | MidpointConstruction | IntersectionConstruction | OffsetConstruction;
 export type AngleArcOp = AngleArcRegionOp | AngleArcCanvasOp;
+export type FigureOp = FigureRegionOp | FigureOnOp;
+/**
+ * @minItems 2
+ * @maxItems 2
+ */
+export type FigureRange = [number, number];
+export type FigureMark = FigureLeafMark | FigureGroupMark;
+export type FigureLeafMark =
+  | FigurePointMark
+  | FigureSegmentMark
+  | FigurePolylineMark
+  | FigureCircleMark
+  | FigureArcMark
+  | FigureFnMark
+  | FigureParamMark
+  | FigurePolarMark
+  | FigureShadeUnderMark
+  | FigureShadeBetweenMark
+  | FigureShadeInsideMark
+  | FigureAngleMark
+  | FigureTangentMark
+  | FigurePerpendicularMark
+  | FigureMeasureMark
+  | FigureTextMark;
+export type FigurePoint =
+  | FigureRange
+  | {
+      at: string;
+    }
+  | {
+      /**
+       * @minItems 2
+       * @maxItems 2
+       */
+      mid: [string, string];
+    }
+  | {
+      on: string;
+      x: number;
+    }
+  | {
+      on: string;
+      t: number;
+    }
+  | {
+      /**
+       * @minItems 2
+       * @maxItems 2
+       */
+      hit: [string, string];
+    }
+  | {
+      foot: string;
+      onto: string;
+    };
 export type LayoutRelation = LayoutPlace | LayoutAlign | LayoutStack | LayoutDistribute;
 /**
  * Opaque server-authenticated continuation capability. Its payload is not a client API.
  */
 export type Receipt = string;
 export type LessonContinuationResponse = LessonContinuationSuccess | LessonContinuationTerminal;
-export type Model = "gpt-5.6-luna" | "gpt-5.6-terra" | "gpt-5.6-sol";
+export type Model = "gpt-6.1-sol" | "gpt-6-luna" | "gpt-6-astra" | "gpt-5.6-luna" | "gpt-5.6-terra" | "gpt-5.6-sol";
 export type ReasoningEffort = "none" | "low";
 export type Sha256 = string;
 export type TerminalReason =
@@ -719,6 +774,446 @@ export interface AngleArcCanvasOp {
   end_deg: number;
   stroke: "solid" | "dashed";
   label?: string;
+}
+export interface FigureRegionOp {
+  op: "figure";
+  id: string;
+  region: "A1" | "A2" | "A3" | "B1" | "B2" | "B3" | "C1" | "C2" | "C3" | "D1" | "D2" | "D3" | "left" | "right" | "full";
+  frame: FigureFrame;
+  /**
+   * @minItems 1
+   * @maxItems 16
+   */
+  marks:
+    | [FigureMark]
+    | [FigureMark, FigureMark]
+    | [FigureMark, FigureMark, FigureMark]
+    | [FigureMark, FigureMark, FigureMark, FigureMark]
+    | [FigureMark, FigureMark, FigureMark, FigureMark, FigureMark]
+    | [FigureMark, FigureMark, FigureMark, FigureMark, FigureMark, FigureMark]
+    | [FigureMark, FigureMark, FigureMark, FigureMark, FigureMark, FigureMark, FigureMark]
+    | [FigureMark, FigureMark, FigureMark, FigureMark, FigureMark, FigureMark, FigureMark, FigureMark]
+    | [FigureMark, FigureMark, FigureMark, FigureMark, FigureMark, FigureMark, FigureMark, FigureMark, FigureMark]
+    | [
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark
+      ]
+    | [
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark
+      ]
+    | [
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark
+      ]
+    | [
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark
+      ]
+    | [
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark
+      ]
+    | [
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark
+      ]
+    | [
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark
+      ];
+  meaning?: string;
+}
+export interface FigureFrame {
+  x: FigureRange;
+  y: FigureRange;
+  axes?: "edge" | "origin" | "none";
+  grid?: boolean;
+  equal_scale?: boolean;
+  x_label?: string;
+  y_label?: string;
+}
+export interface FigurePointMark {
+  kind: "point";
+  id?: string;
+  at: FigurePoint;
+  label?: string;
+}
+export interface FigureSegmentMark {
+  kind: "segment";
+  id?: string;
+  from: FigurePoint;
+  to: FigurePoint;
+  arrow?: boolean;
+  stroke?: "solid" | "dashed";
+  label?: string;
+}
+export interface FigurePolylineMark {
+  kind: "polyline";
+  id?: string;
+  /**
+   * @minItems 2
+   * @maxItems 24
+   */
+  points: [FigurePoint, FigurePoint, ...FigurePoint[]];
+  closed?: boolean;
+  smooth?: boolean;
+  arrow?: boolean;
+  fill?: boolean;
+  stroke?: "solid" | "dashed";
+  label?: string;
+}
+export interface FigureCircleMark {
+  kind: "circle";
+  id?: string;
+  center: FigurePoint;
+  r: number;
+  fill?: boolean;
+  stroke?: "solid" | "dashed";
+  label?: string;
+}
+export interface FigureArcMark {
+  kind: "arc";
+  id?: string;
+  center: FigurePoint;
+  r: number;
+  start: number;
+  end: number;
+  arrow?: boolean;
+  stroke?: "solid" | "dashed";
+  label?: string;
+}
+export interface FigureFnMark {
+  kind: "fn";
+  id?: string;
+  y: string;
+  domain?: FigureRange;
+  stroke?: "solid" | "dashed";
+  label?: string;
+}
+export interface FigureParamMark {
+  kind: "param";
+  id?: string;
+  x: string;
+  y: string;
+  t: FigureRange;
+  stroke?: "solid" | "dashed";
+  label?: string;
+}
+export interface FigurePolarMark {
+  kind: "polar";
+  id?: string;
+  r: string;
+  theta: FigureRange;
+  stroke?: "solid" | "dashed";
+  label?: string;
+}
+export interface FigureShadeUnderMark {
+  kind: "shade";
+  id?: string;
+  under: string;
+  from?: number;
+  to?: number;
+  label?: string;
+}
+export interface FigureShadeBetweenMark {
+  kind: "shade";
+  id?: string;
+  /**
+   * @minItems 2
+   * @maxItems 2
+   */
+  between: [string, string];
+  from?: number;
+  to?: number;
+  label?: string;
+}
+export interface FigureShadeInsideMark {
+  kind: "shade";
+  id?: string;
+  inside: string;
+  /**
+   * @minItems 1
+   * @maxItems 4
+   */
+  except?: [string] | [string, string] | [string, string, string] | [string, string, string, string];
+  label?: string;
+}
+export interface FigureAngleMark {
+  kind: "angle";
+  id?: string;
+  at: FigurePoint;
+  from: FigurePoint;
+  to: FigurePoint;
+  r?: number;
+  label?: string;
+}
+export interface FigureTangentMark {
+  kind: "tangent";
+  id?: string;
+  to: string;
+  x: number;
+  length?: number;
+  stroke?: "solid" | "dashed";
+  label?: string;
+}
+export interface FigurePerpendicularMark {
+  kind: "perpendicular";
+  id?: string;
+  to: string;
+  through: FigurePoint;
+  length?: number;
+  stroke?: "solid" | "dashed";
+  label?: string;
+}
+export interface FigureMeasureMark {
+  kind: "measure";
+  id?: string;
+  from: FigurePoint;
+  to: FigurePoint;
+  label: string;
+}
+export interface FigureTextMark {
+  kind: "text";
+  id?: string;
+  at: FigurePoint;
+  text: string;
+  align?: "left" | "center" | "right";
+  size?: "small" | "normal" | "large";
+}
+export interface FigureGroupMark {
+  kind: "group";
+  id?: string;
+  /**
+   * @minItems 1
+   * @maxItems 8
+   */
+  marks:
+    | [FigureLeafMark]
+    | [FigureLeafMark, FigureLeafMark]
+    | [FigureLeafMark, FigureLeafMark, FigureLeafMark]
+    | [FigureLeafMark, FigureLeafMark, FigureLeafMark, FigureLeafMark]
+    | [FigureLeafMark, FigureLeafMark, FigureLeafMark, FigureLeafMark, FigureLeafMark]
+    | [FigureLeafMark, FigureLeafMark, FigureLeafMark, FigureLeafMark, FigureLeafMark, FigureLeafMark]
+    | [FigureLeafMark, FigureLeafMark, FigureLeafMark, FigureLeafMark, FigureLeafMark, FigureLeafMark, FigureLeafMark]
+    | [
+        FigureLeafMark,
+        FigureLeafMark,
+        FigureLeafMark,
+        FigureLeafMark,
+        FigureLeafMark,
+        FigureLeafMark,
+        FigureLeafMark,
+        FigureLeafMark
+      ];
+  mirror?: "x" | "y";
+  rotate?: number;
+  scale?: number;
+  translate?: FigureRange;
+  origin?: FigureRange;
+  repeat?: number;
+}
+export interface FigureOnOp {
+  op: "figure";
+  id: string;
+  on: string;
+  /**
+   * @minItems 1
+   * @maxItems 16
+   */
+  marks:
+    | [FigureMark]
+    | [FigureMark, FigureMark]
+    | [FigureMark, FigureMark, FigureMark]
+    | [FigureMark, FigureMark, FigureMark, FigureMark]
+    | [FigureMark, FigureMark, FigureMark, FigureMark, FigureMark]
+    | [FigureMark, FigureMark, FigureMark, FigureMark, FigureMark, FigureMark]
+    | [FigureMark, FigureMark, FigureMark, FigureMark, FigureMark, FigureMark, FigureMark]
+    | [FigureMark, FigureMark, FigureMark, FigureMark, FigureMark, FigureMark, FigureMark, FigureMark]
+    | [FigureMark, FigureMark, FigureMark, FigureMark, FigureMark, FigureMark, FigureMark, FigureMark, FigureMark]
+    | [
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark
+      ]
+    | [
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark
+      ]
+    | [
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark
+      ]
+    | [
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark
+      ]
+    | [
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark
+      ]
+    | [
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark
+      ]
+    | [
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark
+      ];
+  meaning?: string;
 }
 export interface LayoutPlace {
   kind: "place";

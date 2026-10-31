@@ -1,0 +1,1731 @@
+{
+ "schema": "chalk.figure-parity.v1",
+ "note": "Schema-1.5 figure op accept/reject cases run by backend/tests/test_figure_validation.py and frontend/src/board/figureValidation.test.ts. For reject cases the last step's op with id `bad` (or the only figure in it) must be rejected while earlier steps are accepted.",
+ "cases": [
+  {
+   "id": "plot_shade_tangent",
+   "expect": "accept",
+   "steps": [
+    {
+     "id": "s1",
+     "script": "Draw the next part of the figure.",
+     "ops": [
+      {
+       "op": "figure",
+       "id": "plot",
+       "region": "right",
+       "frame": {
+        "x": [
+         -2,
+         2
+        ],
+        "y": [
+         -1,
+         4
+        ],
+        "axes": "edge",
+        "x_label": "x",
+        "y_label": "y"
+       },
+       "marks": [
+        {
+         "kind": "fn",
+         "id": "parab",
+         "y": "x^2"
+        }
+       ]
+      }
+     ],
+     "checkpoint": null
+    },
+    {
+     "id": "s2",
+     "script": "Draw the next part of the figure.",
+     "ops": [
+      {
+       "op": "figure",
+       "id": "more",
+       "on": "plot",
+       "marks": [
+        {
+         "kind": "shade",
+         "under": "parab",
+         "from": 0,
+         "to": 1.5
+        },
+        {
+         "kind": "point",
+         "id": "p1",
+         "at": {
+          "on": "parab",
+          "x": 1
+         }
+        },
+        {
+         "kind": "tangent",
+         "to": "parab",
+         "x": 1,
+         "length": 0.5,
+         "stroke": "dashed"
+        }
+       ]
+      }
+     ],
+     "checkpoint": null
+    }
+   ]
+  },
+  {
+   "id": "diagram_constructions",
+   "expect": "accept",
+   "steps": [
+    {
+     "id": "s1",
+     "script": "Draw the next part of the figure.",
+     "ops": [
+      {
+       "op": "figure",
+       "id": "diag",
+       "region": "left",
+       "frame": {
+        "x": [
+         0,
+         4
+        ],
+        "y": [
+         0,
+         3
+        ]
+       },
+       "marks": [
+        {
+         "kind": "point",
+         "id": "pa",
+         "at": [
+          0.5,
+          0.5
+         ]
+        },
+        {
+         "kind": "point",
+         "id": "pb",
+         "at": [
+          3.5,
+          0.5
+         ]
+        },
+        {
+         "kind": "segment",
+         "id": "base",
+         "from": {
+          "at": "pa"
+         },
+         "to": {
+          "at": "pb"
+         }
+        }
+       ]
+      }
+     ],
+     "checkpoint": null
+    },
+    {
+     "id": "s2",
+     "script": "Draw the next part of the figure.",
+     "ops": [
+      {
+       "op": "figure",
+       "id": "build",
+       "on": "diag",
+       "marks": [
+        {
+         "kind": "point",
+         "id": "top",
+         "at": [
+          2,
+          2.5
+         ]
+        },
+        {
+         "kind": "perpendicular",
+         "id": "alt",
+         "to": "base",
+         "through": {
+          "at": "top"
+         },
+         "stroke": "dashed"
+        },
+        {
+         "kind": "point",
+         "id": "ft",
+         "at": {
+          "foot": "top",
+          "onto": "base"
+         }
+        },
+        {
+         "kind": "point",
+         "id": "mid",
+         "at": {
+          "mid": [
+           "pa",
+           "pb"
+          ]
+         }
+        },
+        {
+         "kind": "angle",
+         "at": {
+          "at": "pa"
+         },
+         "from": {
+          "at": "pb"
+         },
+         "to": {
+          "at": "top"
+         },
+         "label": "α"
+        },
+        {
+         "kind": "segment",
+         "id": "side",
+         "from": {
+          "at": "pa"
+         },
+         "to": {
+          "at": "top"
+         }
+        },
+        {
+         "kind": "point",
+         "at": {
+          "hit": [
+           "side",
+           "alt"
+          ]
+         }
+        }
+       ]
+      }
+     ],
+     "checkpoint": null
+    }
+   ]
+  },
+  {
+   "id": "param_polar",
+   "expect": "accept",
+   "steps": [
+    {
+     "id": "s1",
+     "script": "Draw the next part of the figure.",
+     "ops": [
+      {
+       "op": "figure",
+       "id": "curves",
+       "region": "right",
+       "frame": {
+        "x": [
+         -2,
+         2
+        ],
+        "y": [
+         -2,
+         2
+        ],
+        "axes": "origin",
+        "equal_scale": true
+       },
+       "marks": [
+        {
+         "kind": "param",
+         "id": "loop",
+         "x": "cos(t)",
+         "y": "sin(2*t)",
+         "t": [
+          0,
+          6.283
+         ]
+        },
+        {
+         "kind": "polar",
+         "id": "rose",
+         "r": "cos(3*theta)",
+         "theta": [
+          0,
+          3.1416
+         ]
+        },
+        {
+         "kind": "circle",
+         "id": "unit",
+         "center": [
+          0,
+          0
+         ],
+         "r": 1
+        },
+        {
+         "kind": "shade",
+         "inside": "unit"
+        }
+       ]
+      }
+     ],
+     "checkpoint": null
+    }
+   ]
+  },
+  {
+   "id": "group_repeat",
+   "expect": "accept",
+   "steps": [
+    {
+     "id": "s1",
+     "script": "Draw the next part of the figure.",
+     "ops": [
+      {
+       "op": "figure",
+       "id": "hexes",
+       "region": "left",
+       "frame": {
+        "x": [
+         -3,
+         3
+        ],
+        "y": [
+         -3,
+         3
+        ]
+       },
+       "marks": [
+        {
+         "kind": "group",
+         "repeat": 6,
+         "rotate": 60,
+         "origin": [
+          0,
+          0
+         ],
+         "marks": [
+          {
+           "kind": "polyline",
+           "points": [
+            [
+             0,
+             0
+            ],
+            [
+             2,
+             0
+            ],
+            [
+             1,
+             1.732
+            ]
+           ],
+           "closed": true
+          },
+          {
+           "kind": "point",
+           "at": [
+            2,
+            0
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ],
+     "checkpoint": null
+    }
+   ]
+  },
+  {
+   "id": "forward_reference",
+   "expect": "reject",
+   "steps": [
+    {
+     "id": "s1",
+     "script": "Draw the next part of the figure.",
+     "ops": [
+      {
+       "op": "figure",
+       "id": "fwd",
+       "region": "left",
+       "frame": {
+        "x": [
+         0,
+         1
+        ],
+        "y": [
+         0,
+         1
+        ]
+       },
+       "marks": [
+        {
+         "kind": "point",
+         "at": {
+          "at": "later"
+         }
+        },
+        {
+         "kind": "point",
+         "id": "later",
+         "at": [
+          0.5,
+          0.5
+         ]
+        }
+       ]
+      }
+     ],
+     "checkpoint": null
+    }
+   ]
+  },
+  {
+   "id": "cross_figure_reference",
+   "expect": "reject",
+   "steps": [
+    {
+     "id": "s1",
+     "script": "Draw the next part of the figure.",
+     "ops": [
+      {
+       "op": "figure",
+       "id": "plot",
+       "region": "right",
+       "frame": {
+        "x": [
+         -2,
+         2
+        ],
+        "y": [
+         -1,
+         4
+        ],
+        "axes": "edge",
+        "x_label": "x",
+        "y_label": "y"
+       },
+       "marks": [
+        {
+         "kind": "fn",
+         "id": "parab",
+         "y": "x^2"
+        }
+       ]
+      },
+      {
+       "op": "figure",
+       "id": "diag",
+       "region": "left",
+       "frame": {
+        "x": [
+         0,
+         4
+        ],
+        "y": [
+         0,
+         3
+        ]
+       },
+       "marks": [
+        {
+         "kind": "point",
+         "id": "pa",
+         "at": [
+          0.5,
+          0.5
+         ]
+        },
+        {
+         "kind": "point",
+         "id": "pb",
+         "at": [
+          3.5,
+          0.5
+         ]
+        },
+        {
+         "kind": "segment",
+         "id": "base",
+         "from": {
+          "at": "pa"
+         },
+         "to": {
+          "at": "pb"
+         }
+        }
+       ]
+      }
+     ],
+     "checkpoint": null
+    },
+    {
+     "id": "s2",
+     "script": "Draw the next part of the figure.",
+     "ops": [
+      {
+       "op": "figure",
+       "id": "bad",
+       "on": "diag",
+       "marks": [
+        {
+         "kind": "point",
+         "at": {
+          "on": "parab",
+          "x": 1
+         }
+        }
+       ]
+      }
+     ],
+     "checkpoint": null
+    }
+   ]
+  },
+  {
+   "id": "shade_under_segment",
+   "expect": "reject",
+   "steps": [
+    {
+     "id": "s1",
+     "script": "Draw the next part of the figure.",
+     "ops": [
+      {
+       "op": "figure",
+       "id": "diag",
+       "region": "left",
+       "frame": {
+        "x": [
+         0,
+         4
+        ],
+        "y": [
+         0,
+         3
+        ]
+       },
+       "marks": [
+        {
+         "kind": "point",
+         "id": "pa",
+         "at": [
+          0.5,
+          0.5
+         ]
+        },
+        {
+         "kind": "point",
+         "id": "pb",
+         "at": [
+          3.5,
+          0.5
+         ]
+        },
+        {
+         "kind": "segment",
+         "id": "base",
+         "from": {
+          "at": "pa"
+         },
+         "to": {
+          "at": "pb"
+         }
+        }
+       ]
+      }
+     ],
+     "checkpoint": null
+    },
+    {
+     "id": "s2",
+     "script": "Draw the next part of the figure.",
+     "ops": [
+      {
+       "op": "figure",
+       "id": "bad",
+       "on": "diag",
+       "marks": [
+        {
+         "kind": "shade",
+         "under": "base"
+        }
+       ]
+      }
+     ],
+     "checkpoint": null
+    }
+   ]
+  },
+  {
+   "id": "fn_wrong_variable",
+   "expect": "reject",
+   "steps": [
+    {
+     "id": "s1",
+     "script": "Draw the next part of the figure.",
+     "ops": [
+      {
+       "op": "figure",
+       "id": "bad",
+       "region": "right",
+       "frame": {
+        "x": [
+         0,
+         1
+        ],
+        "y": [
+         0,
+         1
+        ],
+        "axes": "edge"
+       },
+       "marks": [
+        {
+         "kind": "fn",
+         "y": "t^2"
+        }
+       ]
+      }
+     ],
+     "checkpoint": null
+    }
+   ]
+  },
+  {
+   "id": "fn_invisible",
+   "expect": "reject",
+   "steps": [
+    {
+     "id": "s1",
+     "script": "Draw the next part of the figure.",
+     "ops": [
+      {
+       "op": "figure",
+       "id": "bad",
+       "region": "right",
+       "frame": {
+        "x": [
+         0,
+         1
+        ],
+        "y": [
+         0,
+         1
+        ],
+        "axes": "edge"
+       },
+       "marks": [
+        {
+         "kind": "fn",
+         "y": "x + 10"
+        }
+       ]
+      }
+     ],
+     "checkpoint": null
+    }
+   ]
+  },
+  {
+   "id": "mark_id_collides_with_element",
+   "expect": "reject",
+   "steps": [
+    {
+     "id": "s1",
+     "script": "Draw the next part of the figure.",
+     "ops": [
+      {
+       "op": "text",
+       "id": "title",
+       "region": "A1",
+       "content": "Title"
+      },
+      {
+       "op": "figure",
+       "id": "bad",
+       "region": "right",
+       "frame": {
+        "x": [
+         0,
+         1
+        ],
+        "y": [
+         0,
+         1
+        ]
+       },
+       "marks": [
+        {
+         "kind": "point",
+         "id": "title",
+         "at": [
+          0.5,
+          0.5
+         ]
+        }
+       ]
+      }
+     ],
+     "checkpoint": null
+    }
+   ]
+  },
+  {
+   "id": "on_unknown_figure",
+   "expect": "reject",
+   "steps": [
+    {
+     "id": "s1",
+     "script": "Draw the next part of the figure.",
+     "ops": [
+      {
+       "op": "figure",
+       "id": "bad",
+       "on": "nowhere",
+       "marks": [
+        {
+         "kind": "point",
+         "at": [
+          0,
+          0
+         ]
+        }
+       ]
+      }
+     ],
+     "checkpoint": null
+    }
+   ]
+  },
+  {
+   "id": "frame_not_increasing",
+   "expect": "reject",
+   "steps": [
+    {
+     "id": "s1",
+     "script": "Draw the next part of the figure.",
+     "ops": [
+      {
+       "op": "figure",
+       "id": "bad",
+       "region": "right",
+       "frame": {
+        "x": [
+         1,
+         0
+        ],
+        "y": [
+         0,
+         1
+        ]
+       },
+       "marks": [
+        {
+         "kind": "point",
+         "at": [
+          0.5,
+          0.5
+         ]
+        }
+       ]
+      }
+     ],
+     "checkpoint": null
+    }
+   ]
+  },
+  {
+   "id": "too_many_expanded_marks",
+   "expect": "reject",
+   "steps": [
+    {
+     "id": "s1",
+     "script": "Draw the next part of the figure.",
+     "ops": [
+      {
+       "op": "figure",
+       "id": "bad",
+       "region": "right",
+       "frame": {
+        "x": [
+         -5,
+         5
+        ],
+        "y": [
+         -5,
+         5
+        ]
+       },
+       "marks": [
+        {
+         "kind": "group",
+         "repeat": 12,
+         "rotate": 30,
+         "marks": [
+          {
+           "kind": "point",
+           "at": [
+            0.0,
+            1
+           ]
+          },
+          {
+           "kind": "point",
+           "at": [
+            0.25,
+            1
+           ]
+          },
+          {
+           "kind": "point",
+           "at": [
+            0.5,
+            1
+           ]
+          },
+          {
+           "kind": "point",
+           "at": [
+            0.75,
+            1
+           ]
+          },
+          {
+           "kind": "point",
+           "at": [
+            1.0,
+            1
+           ]
+          },
+          {
+           "kind": "point",
+           "at": [
+            1.25,
+            1
+           ]
+          },
+          {
+           "kind": "point",
+           "at": [
+            1.5,
+            1
+           ]
+          },
+          {
+           "kind": "point",
+           "at": [
+            1.75,
+            1
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ],
+     "checkpoint": null
+    }
+   ]
+  },
+  {
+   "id": "tangent_outside_frame",
+   "expect": "reject",
+   "steps": [
+    {
+     "id": "s1",
+     "script": "Draw the next part of the figure.",
+     "ops": [
+      {
+       "op": "figure",
+       "id": "plot",
+       "region": "right",
+       "frame": {
+        "x": [
+         -2,
+         2
+        ],
+        "y": [
+         -1,
+         4
+        ],
+        "axes": "edge",
+        "x_label": "x",
+        "y_label": "y"
+       },
+       "marks": [
+        {
+         "kind": "fn",
+         "id": "parab",
+         "y": "x^2"
+        }
+       ]
+      }
+     ],
+     "checkpoint": null
+    },
+    {
+     "id": "s2",
+     "script": "Draw the next part of the figure.",
+     "ops": [
+      {
+       "op": "figure",
+       "id": "bad",
+       "on": "plot",
+       "marks": [
+        {
+         "kind": "tangent",
+         "to": "parab",
+         "x": 5
+        }
+       ]
+      }
+     ],
+     "checkpoint": null
+    }
+   ]
+  },
+  {
+   "id": "segment_without_length",
+   "expect": "reject",
+   "steps": [
+    {
+     "id": "s1",
+     "script": "Draw the next part of the figure.",
+     "ops": [
+      {
+       "op": "figure",
+       "id": "bad",
+       "region": "right",
+       "frame": {
+        "x": [
+         0,
+         1
+        ],
+        "y": [
+         0,
+         1
+        ]
+       },
+       "marks": [
+        {
+         "kind": "segment",
+         "from": [
+          0.5,
+          0.5
+         ],
+         "to": [
+          0.5,
+          0.5
+         ]
+        }
+       ]
+      }
+     ],
+     "checkpoint": null
+    }
+   ]
+  },
+  {
+   "id": "param_range_reversed",
+   "expect": "reject",
+   "steps": [
+    {
+     "id": "s1",
+     "script": "Draw the next part of the figure.",
+     "ops": [
+      {
+       "op": "figure",
+       "id": "bad",
+       "region": "right",
+       "frame": {
+        "x": [
+         -1,
+         1
+        ],
+        "y": [
+         -1,
+         1
+        ]
+       },
+       "marks": [
+        {
+         "kind": "param",
+         "x": "cos(t)",
+         "y": "sin(t)",
+         "t": [
+          3,
+          0
+         ]
+        }
+       ]
+      }
+     ],
+     "checkpoint": null
+    }
+   ]
+  },
+  {
+   "id": "hit_same_mark",
+   "expect": "reject",
+   "steps": [
+    {
+     "id": "s1",
+     "script": "Draw the next part of the figure.",
+     "ops": [
+      {
+       "op": "figure",
+       "id": "diag",
+       "region": "left",
+       "frame": {
+        "x": [
+         0,
+         4
+        ],
+        "y": [
+         0,
+         3
+        ]
+       },
+       "marks": [
+        {
+         "kind": "point",
+         "id": "pa",
+         "at": [
+          0.5,
+          0.5
+         ]
+        },
+        {
+         "kind": "point",
+         "id": "pb",
+         "at": [
+          3.5,
+          0.5
+         ]
+        },
+        {
+         "kind": "segment",
+         "id": "base",
+         "from": {
+          "at": "pa"
+         },
+         "to": {
+          "at": "pb"
+         }
+        }
+       ]
+      }
+     ],
+     "checkpoint": null
+    },
+    {
+     "id": "s2",
+     "script": "Draw the next part of the figure.",
+     "ops": [
+      {
+       "op": "figure",
+       "id": "bad",
+       "on": "diag",
+       "marks": [
+        {
+         "kind": "point",
+         "at": {
+          "hit": [
+           "base",
+           "base"
+          ]
+         }
+        }
+       ]
+      }
+     ],
+     "checkpoint": null
+    }
+   ]
+  },
+  {
+   "id": "shade_inside_open_path",
+   "expect": "reject",
+   "steps": [
+    {
+     "id": "s1",
+     "script": "Draw the next part of the figure.",
+     "ops": [
+      {
+       "op": "figure",
+       "id": "bad",
+       "region": "right",
+       "frame": {
+        "x": [
+         0,
+         1
+        ],
+        "y": [
+         0,
+         1
+        ]
+       },
+       "marks": [
+        {
+         "kind": "polyline",
+         "id": "open",
+         "points": [
+          [
+           0.1,
+           0.1
+          ],
+          [
+           0.9,
+           0.1
+          ],
+          [
+           0.5,
+           0.9
+          ]
+         ]
+        },
+        {
+         "kind": "shade",
+         "inside": "open"
+        }
+       ]
+      }
+     ],
+     "checkpoint": null
+    }
+   ]
+  },
+  {
+   "id": "shade_complement_except",
+   "expect": "accept",
+   "steps": [
+    {
+     "id": "s1",
+     "script": "Draw the next part of the figure.",
+     "ops": [
+      {
+       "op": "figure",
+       "id": "venn",
+       "region": "right",
+       "frame": {
+        "x": [
+         -4.5,
+         4.5
+        ],
+        "y": [
+         -3,
+         3
+        ]
+       },
+       "marks": [
+        {
+         "kind": "polyline",
+         "id": "sample",
+         "points": [
+          [
+           -4,
+           -2.5
+          ],
+          [
+           4,
+           -2.5
+          ],
+          [
+           4,
+           2.5
+          ],
+          [
+           -4,
+           2.5
+          ]
+         ],
+         "closed": true
+        },
+        {
+         "kind": "circle",
+         "id": "ea",
+         "center": [
+          -1,
+          0
+         ],
+         "r": 1.5
+        },
+        {
+         "kind": "circle",
+         "id": "eb",
+         "center": [
+          0.8,
+          0
+         ],
+         "r": 1.5
+        },
+        {
+         "kind": "segment",
+         "id": "edge",
+         "from": [
+          -3.5,
+          -2.2
+         ],
+         "to": [
+          -2.5,
+          -2.2
+         ]
+        }
+       ]
+      }
+     ],
+     "checkpoint": null
+    },
+    {
+     "id": "s2",
+     "script": "Draw the next part of the figure.",
+     "ops": [
+      {
+       "op": "figure",
+       "id": "shading",
+       "on": "venn",
+       "marks": [
+        {
+         "kind": "shade",
+         "inside": "sample",
+         "except": [
+          "ea"
+         ],
+         "label": "not A"
+        }
+       ]
+      }
+     ],
+     "checkpoint": null
+    }
+   ]
+  },
+  {
+   "id": "shade_except_overlapping_holes",
+   "expect": "accept",
+   "steps": [
+    {
+     "id": "s1",
+     "script": "Draw the next part of the figure.",
+     "ops": [
+      {
+       "op": "figure",
+       "id": "venn",
+       "region": "right",
+       "frame": {
+        "x": [
+         -4.5,
+         4.5
+        ],
+        "y": [
+         -3,
+         3
+        ]
+       },
+       "marks": [
+        {
+         "kind": "polyline",
+         "id": "sample",
+         "points": [
+          [
+           -4,
+           -2.5
+          ],
+          [
+           4,
+           -2.5
+          ],
+          [
+           4,
+           2.5
+          ],
+          [
+           -4,
+           2.5
+          ]
+         ],
+         "closed": true
+        },
+        {
+         "kind": "circle",
+         "id": "ea",
+         "center": [
+          -1,
+          0
+         ],
+         "r": 1.5
+        },
+        {
+         "kind": "circle",
+         "id": "eb",
+         "center": [
+          0.8,
+          0
+         ],
+         "r": 1.5
+        },
+        {
+         "kind": "segment",
+         "id": "edge",
+         "from": [
+          -3.5,
+          -2.2
+         ],
+         "to": [
+          -2.5,
+          -2.2
+         ]
+        }
+       ]
+      }
+     ],
+     "checkpoint": null
+    },
+    {
+     "id": "s2",
+     "script": "Draw the next part of the figure.",
+     "ops": [
+      {
+       "op": "figure",
+       "id": "shading",
+       "on": "venn",
+       "marks": [
+        {
+         "kind": "shade",
+         "inside": "sample",
+         "except": [
+          "ea",
+          "eb"
+         ]
+        }
+       ]
+      }
+     ],
+     "checkpoint": null
+    }
+   ]
+  },
+  {
+   "id": "shade_a_only_partial_hole",
+   "expect": "accept",
+   "steps": [
+    {
+     "id": "s1",
+     "script": "Draw the next part of the figure.",
+     "ops": [
+      {
+       "op": "figure",
+       "id": "venn",
+       "region": "right",
+       "frame": {
+        "x": [
+         -4.5,
+         4.5
+        ],
+        "y": [
+         -3,
+         3
+        ]
+       },
+       "marks": [
+        {
+         "kind": "polyline",
+         "id": "sample",
+         "points": [
+          [
+           -4,
+           -2.5
+          ],
+          [
+           4,
+           -2.5
+          ],
+          [
+           4,
+           2.5
+          ],
+          [
+           -4,
+           2.5
+          ]
+         ],
+         "closed": true
+        },
+        {
+         "kind": "circle",
+         "id": "ea",
+         "center": [
+          -1,
+          0
+         ],
+         "r": 1.5
+        },
+        {
+         "kind": "circle",
+         "id": "eb",
+         "center": [
+          0.8,
+          0
+         ],
+         "r": 1.5
+        },
+        {
+         "kind": "segment",
+         "id": "edge",
+         "from": [
+          -3.5,
+          -2.2
+         ],
+         "to": [
+          -2.5,
+          -2.2
+         ]
+        }
+       ]
+      }
+     ],
+     "checkpoint": null
+    },
+    {
+     "id": "s2",
+     "script": "Draw the next part of the figure.",
+     "ops": [
+      {
+       "op": "figure",
+       "id": "shading",
+       "on": "venn",
+       "marks": [
+        {
+         "kind": "shade",
+         "inside": "ea",
+         "except": [
+          "eb"
+         ]
+        }
+       ]
+      }
+     ],
+     "checkpoint": null
+    }
+   ]
+  },
+  {
+   "id": "shade_except_unknown_reference",
+   "expect": "reject",
+   "steps": [
+    {
+     "id": "s1",
+     "script": "Draw the next part of the figure.",
+     "ops": [
+      {
+       "op": "figure",
+       "id": "venn",
+       "region": "right",
+       "frame": {
+        "x": [
+         -4.5,
+         4.5
+        ],
+        "y": [
+         -3,
+         3
+        ]
+       },
+       "marks": [
+        {
+         "kind": "polyline",
+         "id": "sample",
+         "points": [
+          [
+           -4,
+           -2.5
+          ],
+          [
+           4,
+           -2.5
+          ],
+          [
+           4,
+           2.5
+          ],
+          [
+           -4,
+           2.5
+          ]
+         ],
+         "closed": true
+        },
+        {
+         "kind": "circle",
+         "id": "ea",
+         "center": [
+          -1,
+          0
+         ],
+         "r": 1.5
+        },
+        {
+         "kind": "circle",
+         "id": "eb",
+         "center": [
+          0.8,
+          0
+         ],
+         "r": 1.5
+        },
+        {
+         "kind": "segment",
+         "id": "edge",
+         "from": [
+          -3.5,
+          -2.2
+         ],
+         "to": [
+          -2.5,
+          -2.2
+         ]
+        }
+       ]
+      }
+     ],
+     "checkpoint": null
+    },
+    {
+     "id": "s2",
+     "script": "Draw the next part of the figure.",
+     "ops": [
+      {
+       "op": "figure",
+       "id": "bad",
+       "on": "venn",
+       "marks": [
+        {
+         "kind": "shade",
+         "inside": "sample",
+         "except": [
+          "nope"
+         ]
+        }
+       ]
+      }
+     ],
+     "checkpoint": null
+    }
+   ]
+  },
+  {
+   "id": "shade_except_open_shape",
+   "expect": "reject",
+   "steps": [
+    {
+     "id": "s1",
+     "script": "Draw the next part of the figure.",
+     "ops": [
+      {
+       "op": "figure",
+       "id": "venn",
+       "region": "right",
+       "frame": {
+        "x": [
+         -4.5,
+         4.5
+        ],
+        "y": [
+         -3,
+         3
+        ]
+       },
+       "marks": [
+        {
+         "kind": "polyline",
+         "id": "sample",
+         "points": [
+          [
+           -4,
+           -2.5
+          ],
+          [
+           4,
+           -2.5
+          ],
+          [
+           4,
+           2.5
+          ],
+          [
+           -4,
+           2.5
+          ]
+         ],
+         "closed": true
+        },
+        {
+         "kind": "circle",
+         "id": "ea",
+         "center": [
+          -1,
+          0
+         ],
+         "r": 1.5
+        },
+        {
+         "kind": "circle",
+         "id": "eb",
+         "center": [
+          0.8,
+          0
+         ],
+         "r": 1.5
+        },
+        {
+         "kind": "segment",
+         "id": "edge",
+         "from": [
+          -3.5,
+          -2.2
+         ],
+         "to": [
+          -2.5,
+          -2.2
+         ]
+        }
+       ]
+      }
+     ],
+     "checkpoint": null
+    },
+    {
+     "id": "s2",
+     "script": "Draw the next part of the figure.",
+     "ops": [
+      {
+       "op": "figure",
+       "id": "bad",
+       "on": "venn",
+       "marks": [
+        {
+         "kind": "shade",
+         "inside": "sample",
+         "except": [
+          "edge"
+         ]
+        }
+       ]
+      }
+     ],
+     "checkpoint": null
+    }
+   ]
+  },
+  {
+   "id": "shade_except_itself",
+   "expect": "reject",
+   "steps": [
+    {
+     "id": "s1",
+     "script": "Draw the next part of the figure.",
+     "ops": [
+      {
+       "op": "figure",
+       "id": "venn",
+       "region": "right",
+       "frame": {
+        "x": [
+         -4.5,
+         4.5
+        ],
+        "y": [
+         -3,
+         3
+        ]
+       },
+       "marks": [
+        {
+         "kind": "polyline",
+         "id": "sample",
+         "points": [
+          [
+           -4,
+           -2.5
+          ],
+          [
+           4,
+           -2.5
+          ],
+          [
+           4,
+           2.5
+          ],
+          [
+           -4,
+           2.5
+          ]
+         ],
+         "closed": true
+        },
+        {
+         "kind": "circle",
+         "id": "ea",
+         "center": [
+          -1,
+          0
+         ],
+         "r": 1.5
+        },
+        {
+         "kind": "circle",
+         "id": "eb",
+         "center": [
+          0.8,
+          0
+         ],
+         "r": 1.5
+        },
+        {
+         "kind": "segment",
+         "id": "edge",
+         "from": [
+          -3.5,
+          -2.2
+         ],
+         "to": [
+          -2.5,
+          -2.2
+         ]
+        }
+       ]
+      }
+     ],
+     "checkpoint": null
+    },
+    {
+     "id": "s2",
+     "script": "Draw the next part of the figure.",
+     "ops": [
+      {
+       "op": "figure",
+       "id": "bad",
+       "on": "venn",
+       "marks": [
+        {
+         "kind": "shade",
+         "inside": "sample",
+         "except": [
+          "sample"
+         ]
+        }
+       ]
+      }
+     ],
+     "checkpoint": null
+    }
+   ]
+  }
+ ]
+}

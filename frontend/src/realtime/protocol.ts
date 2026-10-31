@@ -36,14 +36,14 @@ export const SERVER_EVENTS = {
   ERROR: "error",
 } as const;
 
-export const SESSION_TOKEN_BUDGET = 50_000;
+export const SESSION_TOKEN_BUDGET = 300_000;
 export const MAX_RESPONSE_OUTPUT_TOKENS = 1_024;
 
 export const COST_CONTROL_CONFIGURATION = {
   type: "retention_ratio",
   retention_ratio: 0.8,
   token_limits: {
-    post_instructions: 4_000,
+    post_instructions: 16_000,
   },
 } as const;
 

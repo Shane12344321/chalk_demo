@@ -37,8 +37,8 @@ API details are version-sensitive. Verify them against official OpenAI documenta
 
 - Development voice: `gpt-realtime-2.1-mini`
 - Recording voice: `gpt-realtime-2.1`
-- Default board model: `gpt-5.6-luna`; evaluate failed Luna topics on `gpt-5.6-terra` only if the unchanged golden-topic gate demonstrates a material quality failure, and use `gpt-5.6-sol` only after both lower-cost tiers are evidenced inadequate
-- Board reasoning baseline: `none` for the six-second latency gate; retain `low` as an allowlisted comparison only if `none` causes a measured lesson-quality regression
+- Default board model (owner-selected 2026-10-18): `gpt-6.1-sol` at `reasoning.effort: low` with board prompt v3, chosen for drawing quality over the six-second latency gate (v3 beat v2 on Sol for completion, latency, and layout in the 2026-10-18 batches). 6.1 Sol and `gpt-6-astra` reject `none`. `gpt-6-luna` at `none` is the low-cost, low-latency fallback.
+- Historical M3 qualification: `gpt-5.6-luna` at `none`. The M3 evaluation harness stays pinned to it so old and new evidence never mix; the GPT-6.1 Sol configuration has no live rubric evidence yet.
 
 Relevant official references:
 
@@ -47,8 +47,9 @@ Relevant official references:
 - `https://developers.openai.com/api/docs/guides/realtime-vad`
 - `https://developers.openai.com/api/docs/models/gpt-realtime-2.1`
 - `https://developers.openai.com/api/docs/models/gpt-realtime-2.1-mini`
+- `https://developers.openai.com/api/docs/models/gpt-6.1-sol`
+- `https://developers.openai.com/api/docs/models/gpt-6-luna`
 - `https://developers.openai.com/api/docs/models/gpt-5.6-luna`
-- `https://developers.openai.com/api/docs/models/gpt-5.6-terra`
 - `https://developers.openai.com/api/docs/guides/latest-model`
 
 Keep all OpenAI event names and payload construction inside `frontend/src/realtime/`; do not scatter protocol strings through UI components. Before considering the Realtime layer complete, capture in `PROGRESS.md` the model ID, session payload, events observed in a live smoke test, browser used, and date.

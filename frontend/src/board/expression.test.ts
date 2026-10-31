@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { compileSafeCurve, sampleVisibleCurveSegments } from "./expression";
+import { compileSafeCurve } from "./expression";
+import { sampleVisibleCurveSegments } from "./scene/sample";
 
 describe("safe curve expressions", () => {
   it("compiles and samples the projectile expression", () => {

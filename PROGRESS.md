@@ -2,6 +2,499 @@
 
 This file is an append-oriented evidence log. Record only checks that were actually run. Current official-documentation expectations are not evidence of live API behavior.
 
+## 2026-10-21 — Prompt v4 is the default (owner decision)
+
+- `BOARD_PROMPT_VERSION` now defaults to `v4` (`backend/app/config.py`, `.env.example`,
+  README). `v3` stays selectable with `BOARD_PROMPT_VERSION=v3` and remains the documented
+  rollback in `general-drawing.md`; `v1`/`v2` are unchanged. The v3 contract and prompt
+  bytes are untouched (hash tests still pin them).
+- Basis, on the fixed 40-topic suite: coverage 0.875 → 0.971, repairs 20 → 1, lessons
+  completed 39 → 40, median lesson 23.2 → 14.5 s; clean gallery boards 36 for v3 against
+  31–38 across three v4 runs (visible-ink check); the owner-approved AI blind judgment
+  preferred v4 on 26 topics, v3 on 7, 7 split.
+- Tests: the stream-header test now follows the configured default; a new test pins the v4
+  default and that `BOARD_PROMPT_VERSION=v3` still sends the v3 prompt (with the legacy
+  ops) and hashes it.
+- A local `.env` that sets `BOARD_PROMPT_VERSION=v3` still overrides the new default.
+- Verification: backend 407 tests, Ruff; frontend 1177 tests in 75 files, ESLint, `tsc -b`,
+  production build; `git diff --check`.
+
+## 2026-10-21 — Gallery measures visible ink only; text-mark placement was not the cause
+
+- The owner asked to let model-placed `text` marks move clear of ink before deciding the v4
+  default. Diagnosis on all 120 v4 boards first: of the overlaps the label solver can see,
+  every one is ink from a later step crossing an earlier label, and only one involves a
+  `text` mark (wave-standing "fixed", 2026-10-19). Freeing text marks would not change the
+  numbers, so they keep `nudge` mobility.
+- What did inflate v4's findings was the gallery check itself
+  (`frontend/src/gallery/boardQuality.ts`): it counted the invisible reveal-timing path
+  drawn under every figure `text` mark as ink, and a translucent shading (`DIAGRAM_FILL`,
+  alpha 0.12) as solid over its whole bounding box, so a label written inside a shaded
+  region scored a 100% overlap. It now counts only visible ink: invisible paths are
+  skipped, and a tint (alpha ≤ 0.35) is footprint but not an obstacle for text. SVG paint
+  defaults are respected (no `fill` attribute fills black). New DOM test.
+- Clean boards, same NDJSON and renderer (`artifacts/evidence/gallery-remeasure-20261021.json`):
+  v3 36 → 36; v4 (10-19) 32 → 35; v4 (10-21 a) 31 → 38; v4 (10-21 b) 27 → 31. v4 averages
+  34.7 against v3's 36, inside its own run-to-run spread. Left: later-step crossings, and
+  one equation clipped by 10 px (trig-amplitude, run b).
+- Verification: frontend 1177 tests in 75 files, ESLint, `tsc -b`, production build;
+  `git diff --check`.
+
+## 2026-10-21 — Checkpoint-limits re-run and AI blind judgment (owner-approved)
+
+- Second owner-approved v4 batch with the checkpoint fix loaded (40 topics, same settings).
+  Retained in `artifacts/evidence/suite40-v4r3-sol-20261021/`.
+
+  | 40 topics | v3 (10-19) | v4 (10-19) | v4 (10-21 a) | v4 (10-21 b) |
+  |---|---|---|---|---|
+  | Lessons completed | 39 | 40 | 40 | 40 |
+  | Required-feature coverage | 0.875 | 0.958 | 0.971 | 0.971 |
+  | Repairs / dropped steps | 20 / 2 | 32 / 1 | 12 / 0 | 1 / 0 |
+  | Logged model calls; output tokens | 55; 37.7K | 72; 42.4K | 52; 37.5K | 41; 34.4K |
+  | Median first step / total | 14.4 s / 23.2 s | 8.6 s / 18.9 s | 8.9 s / 17.3 s | 7.7 s / 14.5 s |
+  | Lessons with a checkpoint | – | 22 | 28 | 40 |
+  | Gallery clean boards (current renderer) | 36 | 32 | 31 | 27 |
+
+  The one remaining repair is `latex_command`; no checkpoint had to be dropped locally, so
+  stating the limits in the contract was enough. Gallery cleanliness varies widely between
+  runs of the same code (31 vs 27); several of b's findings are model-placed text inside
+  shaded regions and labels crossed by later steps.
+- The owner replaced the human blind page with an AI judge. 16 fresh Claude Sonnet
+  subagents (medium effort), 5 pairs each, saw only the topic, a five-point rubric
+  (correctness, idea visible in the drawing, legibility, completeness, layout) and two
+  1600×900 renders: v3 boards from 2026-10-19 vs v4 boards from batch b, both drawn with the
+  current renderer. Every topic was judged twice with sides swapped. Result: v4 better on
+  26 topics, v3 on 7, 7 split between orders; 59 of 80 judgments chose v4; 33 of 40 topics
+  got the same verdict in both orders; board 1 won 51% of picks (no position bias).
+  `artifacts/evidence/judge-v3-vs-v4r3-20261021/judgment.json` holds the key, verdicts and
+  reasons. v3 won the symmetry boards (hexagon, star, butterfly), radians, similar
+  triangles, and the number-line pair; the judges cite v4's stray marks, doubled lines, a
+  wrong side label, and missing tick numbers.
+- Promotion rule (`general-drawing.md`): the blind sample prefers v4 and coverage, repairs,
+  completion and speed improve, but gallery clean boards do not hold (27–32 vs 36). Defaults
+  unchanged: `BOARD_PROMPT_VERSION=v3`.
+
+## 2026-10-21 — Owner-approved v4 re-run after the board-intelligence round
+
+- Batch: 40 topics, gpt-6.1-sol, reasoning low, one-shot, concurrency 2, prompt v4
+  (`827f043a…`), code as in the entry below. Retained in
+  `artifacts/evidence/suite40-v4r2-sol-20261021/` with `score.json` and `quality.json`.
+
+  | 40 topics, prompt v4 | 2026-10-19 | 2026-10-21 |
+  |---|---|---|
+  | Lessons completed | 40 | 40 |
+  | Required-feature coverage (current detector) | 0.958 | 0.971 |
+  | Topics fully covered | 36 | 38 |
+  | Repairs / dropped steps | 32 / 1 | 12 / 0 |
+  | Logged model calls; output tokens | 72; 42.4K | 52; 37.5K |
+  | Input tokens (cached) | 262K (243K) | 222K (210K) |
+  | Median first step / total | 8.6 s / 18.9 s | 8.9 s / 17.3 s |
+  | Gallery clean boards (current renderer) | 32 | 31 |
+  | Gallery overlaps / off-board | 9 / 0 | 9 / 0 |
+  | Label boxes crossed by later-step ink (probe) | 29 | 21 |
+
+- Repair causes logged this run: `checkpoint` 11, `latex_command` 1 (2026-10-19: `latex` 11,
+  `checkpoint` 11). No extra checkpoint was dropped, so these 11 were not the one-per-lesson
+  budget: the checkpoint object itself broke the schema. Both contracts showed
+  `checkpoint:null|checkpoint` without defining it, so the model never saw the 120/80
+  character limits, and 11 of the 12 repaired lessons ended with no checkpoint at all.
+- Fix after the batch (not yet measured live): the v4 contract spells out
+  `checkpoint:null|{question:string[1..120],expected_gist:string[1..80]}` (3,674 of 3,700
+  chars), the v4 prompt states the limits, and a checkpoint that still breaks its schema is
+  dropped and recorded (`dropped_invalid_checkpoint`, added to the stream schema) instead of
+  costing a repair call, which is what the repairs produced anyway. v3 is unchanged.
+- New vocabulary in use: one `shade … except` (prob-complement now shows its region), 7
+  unlabelled or 90° angle marks (square corners where right); hand-drawn three-point marker
+  polylines 6 → 1.
+- Coverage misses left: wave-lens (lens drawn as a line, not round; this run also missed
+  `line:3`), shape-spiral (quarter arcs do not count as a `curve`).
+- Verification: backend 406 tests, Ruff; frontend 1096 tests (the new boards join the
+  evidence-driven parity tests), ESLint, `tsc -b`, production build; `git diff --check`.
+
+## 2026-10-21 — Board intelligence round: adversarial review fixes (no model calls)
+
+- Adversarial review of all 80 suite boards (v3 and v4 contact sheets), the label solver,
+  and both figure validators. Fixes:
+  - Titles never break mid-word while a smaller size fits ("Pythagorea / n"); a line may end
+    after an inner dash only when that saves a line or a stranded last word
+    ("The 68–95–" / "99.7 rule").
+  - Axis tick values that would collide with the zero tick are dropped; legacy axes draw
+    through the scene `renderFrame`.
+  - Label solver: fixed labels place first; labels avoid the ink of every op in the same
+    step (a step commits atomically, so still prefix-stable); labels are clamped onto the
+    board; text stacked on text costs more than a stroke crossing it; when nothing near is
+    clear, one wider search takes only a clean spot. Label boxes use the measured monospace
+    advance (0.6 em, was 0.58), which fixes the one off-board label.
+  - Labels render in a top layer (`data-board-layer="labels"`, `data-label-for`) with a
+    board-coloured halo, so a stroke from a later step passes behind a label instead of
+    over it. The gallery and the measured lint attribute layer labels to their element.
+  - Figure labels (`scene/outward.ts`): a point on a closed outline is named outside it; a
+    point inside one (a centre, a centroid) on the side away from the ink around it; in
+    frameless figures other point and side labels face away from the window's centre.
+    Plots keep upper-right point labels; legacy frames are unchanged (parity holds).
+  - Figure angle marks that look right (within 1° on screen) and are unlabelled or "90°"
+    draw the square corner; a named angle (θ) keeps its arc.
+- Probe on the same NDJSON (label boxes crossed by another element's ink): every remaining
+  crossing comes from a later step (same-step crossings 0 in both suites); v4 36 → 29,
+  v3 24 → 24. Prefix stability forbids moving committed labels, so these are left to the
+  halo.
+- Schema 1.5 addition: `shade inside` takes `except` (1–4 earlier closed shapes left
+  clear): a Venn complement, "neither", or "A but not B". Rendered as a masked fill, so
+  overlapping holes and holes that stick out are correct; the region label goes to the
+  roomiest point of the shaded part. Mirrored in both validators; `figure-parity.json`
+  +6 cases (24). Prompt v4 mentions `except` and square right angles (contract 3,631 of
+  3,700 chars).
+- Cheaper repairs: a second checkpoint is dropped and recorded (`dropped_extra_checkpoint`,
+  added to the stream schema) instead of costing a repair call; this was 11 of the 22
+  categorized v4 repairs. The LaTeX lint allowlist gains about 150 commands verified to
+  render under the browser's exact KaTeX options, plus an environment check (cases,
+  aligned, gathered, matrix family, array); `latex-parity.json` +14 cases (41). Repair logs
+  split LaTeX causes (`latex_command`, `latex_environment`, `latex_braces`, …), still
+  closed categories only. How many of the 11 LaTeX repairs this removes needs a live run.
+- Detector (`scene/features.ts`): closed shapes add their edges to the cycle graph (a
+  rectangle split into squares counts its squares), segments between named points and
+  midpoints are followed, and a small L resting in a corner counts as an angle marker.
+  Re-scored with the same detector for both: coverage v3 0.812 → 0.875 (28 → 30 fully
+  covered), v4 0.938 → 0.958 (35 → 36). v3 had been under-counted more.
+- Differential fuzz: `backend/app/figure_fuzz.py` writes seeded cases with the backend
+  verdict; `frontend/scripts/figure-fuzz.mjs` adds the browser verdict and renders every
+  accepted case. Seeds 1–3 × 6,000: 17,838 compared, no disagreement beyond the pinned
+  exponent-cap asymmetry (6 cases), no crashes. Renderer-only skips (a `hit` of marks that
+  do not cross, constructions running off the board, tangents at a curve's visible edge)
+  never occurred live: 0 renderer warnings in 80 boards, 0 of 464 literal points outside
+  their windows.
+- Gallery, same 80 boards re-rendered offline (`quality-20261021.json` and
+  `score-20261021.json` beside each run): v3 34 → 36 clean (overlaps 7 → 5); v4 31 → 32
+  clean (overlaps 9 → 9, off-board 1 → 0). Every v4 overlap left is later-step ink over an
+  earlier label.
+- Verification: frontend 1016 tests in 75 files, ESLint, `tsc -b`, production build;
+  backend 402 tests, Ruff check and format (new files).
+- Defaults unchanged: `BOARD_PROMPT_VERSION=v3`, `VITE_CHALK_SCENE=legacy`.
+- Next smallest tasks: one owner-approved v4 re-run to measure repairs, `except`, and square
+  corners on fresh boards; reject tangents at a curve's visible edge in both validators;
+  owner blind judgment.
+
+## 2026-10-19 — Drawing suite baseline, schema 1.5 figures, prompt v4 (owner-approved live batches)
+
+- Fixed evaluation suite `tests/eval/drawing-suite-v1.json`: 40 topics in 8 categories,
+  each with machine-checkable "must show" features (plot, curve, region, round, polygon,
+  vector, angle, point, line, with counts). One calibration after the v3 pilot, recorded in
+  the file: standing waves no longer requires axes.
+- Tooling: `backend/app/drawing_suite.py` (owner-gated runner, `--approved-by-owner`, no
+  retries, stops on rejection/outage, `--append` never re-runs a topic);
+  `frontend/scripts/suite-score.mjs` (offline scorer: production decoder → scene IR →
+  `scene/features.ts`, joins token usage from the backend log). The detector counts closed
+  shapes built from separate strokes (cycle rank after splitting at touches/crossings) and
+  hand-drawn axes, so v3 boards are not under-counted. Repair calls now log token usage, and
+  invalid steps log closed issue categories only (no content).
+- Schema 1.5 `figure` op (`shared/schema/lesson.schema.json`): a frame
+  (`x`/`y` window, y up, `axes edge|origin|none`, grid, equal scale, axis labels) plus 1–16
+  marks (point, segment/arrow, polyline/polygon, circle, arc, fn, param, polar, shade
+  under/between/inside, angle by rays, tangent, perpendicular, measure, text, group with
+  mirror/rotate/scale/translate and repeat). Points are coordinates or references
+  (`at`, `mid`, `on x`, `on t`, `hit`, `foot`). `figure … on` adds marks to an earlier figure.
+  Still 4 ops per step. Rules mirrored in `frontend/src/board/figureValidation.ts` and
+  `backend/app/figure_validation.py`, pinned by `shared/fixtures/figure-parity.json`
+  (18 cases, both languages); per-variable expression checks (`x`, `t`, `theta`) in both.
+  Figures compile to the scene IR (`scene/compileFigure.ts`) and always take the scene
+  pipeline. Figure perpendiculars from a point off the line draw to its foot; constructed
+  lines in figures are clipped to the frame instead of dropped.
+- Prompt v4 (`backend/app/prompts/board_engine_v4.md`, `BOARD_PROMPT_VERSION=v4`, opt-in):
+  contract shows only text, equation, and figure (one coordinate convention); worked
+  examples avoid suite topics and validate in both validators. v1–v3 contracts are
+  byte-identical (contract hash `589b4d28…`, v3 prompt `08f6a1db…` pinned by test).
+- Live batches (gpt-6.1-sol, reasoning low, one-shot, owner approved each in turn:
+  v3 pilot 8, v3 remainder 32, v4 pilot 8, v4 remainder 32). Retained in
+  `artifacts/evidence/suite40-v3-sol-20261019/` and `suite40-v4-sol-20261019/` with
+  `score.json` and `quality.json`.
+
+  | 40 topics | v3 | v4 |
+  |---|---|---|
+  | Lessons completed | 39 | 40 |
+  | Required-feature coverage | 0.812 | 0.938 |
+  | Topics fully covered | 28 | 35 |
+  | Median first step | 14.4 s | 8.6 s |
+  | Median total | 23.2 s | 18.9 s |
+  | Repairs / dropped steps | 20 / 2 | 32 / 1 |
+  | Gallery clean boards | 34 | 31 |
+  | Gallery overlaps / off-board | 7 / 0 | 9 / 1 |
+  | Mean board coverage | 0.197 | 0.239 |
+  | Logged model calls; output tokens | 55; 37.7K | 72; 42.4K |
+
+  Coverage gains by category: calculus 0.80→1.00, geometry 0.67→1.00, algebra 0.70→0.90,
+  shapes 0.60→0.80, probability 0.80→0.93; one regression (tangent-radius: no angle mark).
+  The v3 pilot's 4 repairs predate repair-usage logging, so v3 calls are under-logged.
+  Repair causes logged for the v4 remainder: `latex` 11, `checkpoint` 11, no figure rule.
+- Not better yet: v4 clean boards fell 34→31; most new findings are model-placed `text`
+  marks or child labels landing on figure ink (e.g. radians: a label on the radius), plus
+  one 9 px off-board. Repairs rose 20→32 (LaTeX lint and the one-checkpoint budget).
+- Blind judgment page (owner-only):
+  https://claude.ai/artifact/ScaE9XFBiLyscev8AjPZDK — 40 pairs, sides shuffled, votes in
+  the artifact db (`votes/<viewer>`, readable only by the owner). The side key is
+  `artifacts/evidence/suite40-v4-sol-20261019/blind-test-side-key.json` (do not open before
+  judging). Gallery `boardQuality.ts` treats a figure's `on` children like plotted marks.
+- Verification: frontend 982 tests in 74 files, ESLint, `tsc -b`, production build; backend
+  376 tests, Ruff; `git diff --check`.
+- Defaults unchanged: `BOARD_PROMPT_VERSION=v3`, `VITE_CHALK_SCENE=legacy`.
+- Next smallest tasks: owner blind judgment (promotion rule); normalize an extra
+  checkpoint to null and extend the LaTeX allowlist from the logged categories to cut
+  repairs; make figure `text` marks avoid ink like free labels; then one owner-approved
+  v4 re-run.
+
+## 2026-10-19 — General drawing Phase 2: scene IR, renderer path, motion core
+
+- New `frontend/src/board/scene/` (renderer only, no wire-schema or prompt change):
+  - `types.ts`: frames (pixel box + one coordinate window `x:[a,b]×y:[c,d]`, math
+    y-up; `axes edge|origin|none`, `grid`, `equalScale`) and marks (point, path
+    closed/smooth/arrow, line from-to/through-slope/tangent/normal, vector, circle,
+    ellipse, arc, fn, param, polar, region, angle, measure, label, group with
+    transform and repeat). Rendered paths keep cubic Bézier `subpaths` beside `d`.
+  - `frame.ts`: the one frame→pixel transform. `refs.ts`: point references
+    (`at`, `end`, `mid`, `on t`, `on x`, `hit`, `foot`, `beside`) resolved on rendered
+    ink, plus a dependency graph that orders marks and rejects unknown, forward, and
+    cyclic references. `sample.ts`: fn/param/polar through the existing locked-down
+    compiler, now per variable (`x|t|theta`). `marks.ts`: geometry for every kind
+    with one table of seed, stroke-group, and label-anchor conventions. `expand.ts`:
+    group affine transforms and repeats. `render.ts`: scene → board geometry with
+    per-element caching and per-mark failure isolation. `labelSolver.ts` moved here.
+  - `motion.ts`: Manim's `interpolate(alpha)` contract, rate enum (`linear`,
+    `smooth`, `ease_in_out`, `there_and_back`, `rush_into`, `rush_from`), and a
+    weighted `lag_ratio` stagger that now drives both op timing and stroke-group
+    reveal (lag 1 reproduces the old formulas exactly, pinned by property tests).
+  - `morph.ts`: grown from the `pathMorph.ts` spike. Inks are aligned once at
+    preparation; frames are `d = morphAt(aligned, rate(opProgress))`; at progress 1
+    the target's own seeded rough.js paths are shown, never re-roughened. The board
+    paints `transform` (source hidden once the morph starts), `fade_in`, and
+    `indicate`; the manifest keeps a transform's source until the morph commits.
+    Only the scene IR can request these until Phase 3 adds wire ops.
+  - `compileLegacy.ts`: every current op → frames and marks (text/equation notes;
+    axes → plot frame with edge axes; curve → fn; diagram, sketch, standalone
+    line/arrow/point/angle_arc → equal-scale frames with v flipped; constructions →
+    point references; diagram text → `label` side `on`).
+- Flag: `VITE_CHALK_SCENE=legacy|scene` (`boardRendererConfig.ts`, default `legacy`;
+  documented in `.env.example`). The board gallery accepts `?scene=legacy|scene`.
+- Duplication removed: data→pixel (3 copies plus the axes zero lines) now all go
+  through the frame transform; normalized→canvas (4 copies) through
+  `mapDiagramPoint`; overlap ratio (3 copies plus two test copies) through
+  `layout.overlapRatio`; arc sampling and the stroke ease each once. Legacy
+  `construction.ts` delegates its geometry to `scene/refs.ts` (585 → 364 lines);
+  shared rough.js helpers moved from `geometry.ts` to `roughInk.ts`, op wording to
+  `opDescriptions.ts`.
+- Not done / divergences from the plan text: root placement still comes from
+  `layout.ts` on both pipelines (layout still resolves constructions for their
+  boxes, now through the shared refs rules); region fills live in `marks.ts`, not a
+  separate `clip` module, and are not yet painted in a per-frame underlay; style
+  `tone` applies only to function-like marks; equations stay KaTeX.
+- Verification (no API calls):
+  - Parity, legacy vs scene, on 3 cached lessons, 10 golden fixtures, 57 retained
+    evidence boards, the physics fixtures, a synthetic every-primitive board, and the
+    7 accepting construction-parity cases: identical element order, warnings, kinds,
+    summaries, label fields, manifest parts, stroke styles, reveal groups, and seed
+    keys; worst numeric difference 1.1e-13 px (root boxes, ink, labels); 473 of 564
+    path strings byte-identical, the rest float rounding. The 11 rejecting
+    construction cases, forced past layout, fail in `scene/refs.ts` with the same
+    closed codes.
+  - Prefix stability on the scene path: every prefix of all 70 lessons draws
+    exactly the full run's first elements (fresh and streaming renderer).
+  - Freeze/resume: the real `fixedSyncReducer` (speech → FROZEN with ignored ticks →
+    QA → RESUME) driving the real `Board` on two cached lessons and `BoardInk` on a
+    scene with create/fade/indicate/transform motions renders the same frame
+    sequence as an uninterrupted run; every frozen frame equals the frame at p.
+  - Board gallery (`gallery.html`, `window.__chalkGallery`): 72 lessons, 2 failed
+    generations, 65 of 70 boards clean with the same five findings, on both
+    pipelines; the per-lesson fingerprint (issues, element counts, coverage) hashes
+    identical to the pre-change baseline captured this session.
+  - Frontend 799 tests in 72 files (was 601 in 67), ESLint, `tsc -b`, production
+    build, backend 354, `git diff --check`.
+- Test config: Vitest's `fs.allow` now covers `artifacts/evidence/` (was one batch
+  directory) so parity and prefix tests replay every retained board; dev and build
+  are unchanged.
+- Next smallest task: Phase 3 wire schema 1.5 compiling straight to this IR, starting
+  with frames plus point/line/fn marks and the per-step budgets; then a renderer-only
+  blind round with `VITE_CHALK_SCENE=scene` before flipping the default.
+
+## 2026-10-19 — Manim study folded into the general drawing plan
+
+- A separate read-only session studied 3b1b/manim (manimgl `fafa083a`) and
+  ManimCommunity/manim (`b31c77e1`); report at `docs/research/manim-study.md`, every
+  claim cited to file and line. Spot-checked here against the pinned sources: manimgl
+  pipes raw frames into an ffmpeg subprocess, ManimCE encodes in-process with PyAV, and
+  manimgl's window now renders with wgpu.
+- Finding: Manim outputs video because `Scene.play` is an offline fixed-fps loop over
+  imperative Python and LaTeX needs subprocesses; neither version can pause mid-`play`
+  and resume. CHALK already has Manim's central property (every frame a pure function of
+  progress); it lacks shape-to-shape motion. Recommendation: borrow Manim's model and
+  names, port a ~400–700 line morph core, and use MathJax SVG glyphs for equation
+  morphing behind a flag; do not adopt manim-web or Motion Canvas as runtimes.
+- Plan updated (`docs/exec-plans/active/general-drawing.md`): new principle "Manim's
+  model, not Manim's runtime"; Phase 2 adds Bézier subpaths on marks, `scene/motion.ts`,
+  `scene/morph.ts`, and a freeze-then-resume equivalence gate; Phase 3 adds `transform`,
+  `match_tex`, `move_along`, `indicate`, `fade_in` ops with takeover-ID and manifest rules
+  and `VITE_CHALK_MATH=katex|mathjax`.
+- The study's spike `frontend/src/board/pathMorph.ts` (103 lines, not wired in) passes
+  its 7 tests and lint here.
+
+## 2026-10-18 — General drawing plan; Phase 1 universal mechanisms
+
+- Owner blind test (`CHALK Blind Board Test` artifact, 20 pairs rendered from retained
+  NDJSON with no API calls): whole system 9/10 for after; renderer-only 0/10 for after.
+  The model/prompt change carried the gain; the earlier renderer patches did not. The
+  owner asked for general drawing capability instead of op-specific fixes.
+- Read-only audit of `frontend/src/board/` found 11 coordinate systems, label positions
+  set in 13 places with three separate search loops, duplicated mappings (data→pixel ×3,
+  canvas ×4, overlap ratio ×3), fixed intrinsic sizes, layout that ignored labels and
+  accepted up to 15% root overlap, and hard expressiveness caps (y=f(x) only, no marks in
+  graph data coordinates, no fills, polygons, parametric/polar curves, or transforms).
+- Plan: `docs/exec-plans/active/general-drawing.md` (frames + marks scene model, one
+  label solver, one no-overlap guarantee, one fit rule, one measurement truth, closed
+  loop, broad 40-prompt suite with blind pairwise promotion rule; schema 1.5 phased behind
+  `VITE_CHALK_SCENE`).
+- Phase 1 implemented (no wire or prompt change):
+  - `labelSolver.ts` places every label on the board in commit order with one cost
+    function over stroke-level ink (paths flattened to polylines in a grid index),
+    typeset blocks, and earlier labels; mobility `fixed|nudge|free`; smaller-size
+    fallback. It replaces `declutterCanvasLabels`, `resolveDiagramLabelCollisions`, and
+    the straight-line nudge. Prefix-stable by construction (pinned by test).
+  - `layoutLint.ts` uses the solver's ink model across all elements and bounds labels by
+    the board edge. Lint tests updated to the shared collision model.
+  - `layout.ts` `clearPlacement`: region, anchored, and diagram roots that still intrude
+    on a committed root (>2% of the smaller box) move to the nearest clear spot, then
+    shrink to 0.85/0.72/0.6 if needed.
+  - Axes on plot edges with faint zero reference lines, replacing the
+    axis-through-origin special case the blind test rejected.
+- Board gallery (dev only, `http://localhost:5173/gallery.html`, `?dir=<path prefix>`):
+  a `serve`-only Vite plugin (`frontend/devtools/lessonSource.ts`, traversal-checked)
+  lists retained NDJSON under `artifacts/evidence/`, golden fixtures, and cached lessons;
+  each renders with the production `Board`, and `src/gallery/boardQuality.ts` scores it
+  (text/equation/label overlaps, clipped equations, off-board, text under 14px, short
+  last lines, coverage) and exposes `window.__chalkGallery` for automation.
+- Gallery result on the finished Phase 1 renderer, no API calls: 72 lessons, 2 failed
+  generations (no board), 65 of 70 renderable boards clean; remaining findings are four
+  12–22% overlaps (torque, Sol Newton, Sol vector addition, Luna unit circle) and one
+  element 5px past the board edge. All 10 golden fixtures and 3 cached lessons are clean.
+  The blind-test regressions are gone: the Luna standing-waves equation no longer runs
+  into the wave and the derivative's y-axis is back on the plot edge. Axis titles are
+  `nudge` labels so a centred `0` tick and the x title no longer collide.
+- No pre-Phase-1 gallery baseline exists (the gallery postdates it), so this is the
+  baseline for later phases, not a before/after claim.
+- Verification: frontend 594 tests in 66 files, backend 354, ESLint, Ruff, production
+  build, and `git diff --check` pass.
+
+## 2026-10-18 — Drawing iteration on GPT-6.1 Sol: prompt v3 default plus four renderer fixes
+
+- Owner asked to iterate on drawing quality until solid, stopping at 50% of the 5-hour
+  plan window. 27 additional paid `POST /lesson` calls (28 including the earlier smoke),
+  all on `gpt-6.1-sol`/`low`, no retries. Measured usage: ~4.9–5.1K input tokens (≥99%
+  cached after the first call), 557–1,185 output tokens, 0–478 reasoning tokens, about
+  0.7–1.5¢ per lesson. Raw validated NDJSON and per-topic generation summaries are in
+  `artifacts/evidence/gpt61sol-drawing-iteration-20261018/`.
+- Review method: each stream replayed in the diagnostics board at 1440×900 with a
+  read-only metric pass (element bounding boxes for text/equation overlaps, equation
+  ink vs box, wraps, out-of-board) plus visual inspection of diagram boards.
+- Prompt v2 vs v3 on Sol, same five topics plus standing waves: v3 finished 6/6
+  (first step 4.4–15.6 s, median ~5.2 s, 2 repairs); v2 finished 5/6 with one 45 s
+  `generation_timeout` (first step 6.2–34.5 s, 4 repairs) and showed text-on-diagram,
+  text-on-text, clipped equations, and orphaned wraps. **Default is now prompt v3.**
+- Renderer fixes, all deterministic and committed-prefix safe:
+  1. **Equation size feedback loop.** The length heuristic assumed ~0.9 em/char and
+     precommit measurement fed each shrunken box back into it for three iterations, so
+     long equations collapsed to 10 px. Equations now measure at 31 px and only the
+     painter's measured fit (`FittedEquation`) shrinks them. Final equations went from
+     ~10 px to 18–31 px.
+  2. **Square diagram canvases.** Diagram-family roots used a 700×430 canvas, so the
+     normalized [0,1]² space stretched 1.6×: circles drew as ellipses and angle arcs,
+     perpendiculars, and slopes disagreed with their geometry. Canvases are now square.
+  3. **Axes through zero.** The x-axis was pinned to the plot bottom even for data
+     crossing zero (sine and standing waves looked shifted). Axes now pass through zero
+     when the range crosses it, with a `0` tick and a `y.min` label.
+  4. **Readable axis numbers.** `6.283185` now renders as `2π`; other values use simple
+     π fractions or three significant figures.
+  5. **Authored diagram text off straight lines.** Model-placed text crossing an
+     axis-aligned line in the same diagram moves to the nearest clear spot (sideways or
+     past the line's end), dropping to the 24 px diagram size only if needed.
+- Prompt v3 guidance added (new hash `08f6a1db…`): every lesson draws at least one graph
+  or diagram; after the opening, all but at most one step adds to or marks up the
+  picture; never end with two equation-only steps; ~25 characters of diagram text span
+  the canvas. Same 8 new topics before/after: diagrams or marks now appear in nearly
+  every step (chain rule gained a rate-chain diagram), 8/8 complete, metrics clean on
+  7/8 (one orphaned wrap). Cost: median first step rose from ~6 s to ~12 s.
+- Verification: frontend 552 tests in 63 files (new `drawingQuality.test.ts` pins square
+  canvases, zero-crossing axes, axis formatting, and the text nudge), backend 354, ESLint,
+  Ruff, and the production build pass.
+- Plain board text now wraps with balanced lines (same line count, narrowest width), so a
+  short last word is no longer stranded ("Nodes: x = 0" / "and x = L").
+- Final no-spend replay of all 28 retained boards through the finished renderer: every
+  v3 board is clean (22/22) on text/equation overlap, equation clipping, out-of-board, and
+  orphaned-wrap metrics; the smallest equation is 18 px. The only failing board is the
+  retired-prompt v2 Newton lesson, whose model-authored text overlaps.
+- Known remaining issues: first ink is ~5–23 s on Sol (median ~12 s with the visual-first
+  guidance); a label drawn in an earlier step can still be crossed by ink added later
+  (moving committed ink is forbidden); boards often leave the lower third empty.
+
+## 2026-10-18 — Wide equations shrink to fit instead of clipping
+
+- Root cause of the clipped `L=λ/2 ⇒ λ=2L`: equation font size comes from a LaTeX
+  length heuristic (`equationFontSizeForContent`) that cannot see KaTeX spacing such as
+  `\quad` or relation gaps, and nothing compared the real rendered width with the box.
+  Overflow was hidden by the box's `overflow: hidden`.
+- Added `FittedEquation`, used by both the board painter and annotation overlays. In a
+  layout effect (before paint) it measures the union of KaTeX `.base` runs against its
+  box in screen pixels and, only when ink overflows, shrinks the font proportionally
+  with a 4% margin, floored at 8 px. Box geometry, layout, lints, reveal clipping, and the
+  manifest are unchanged, so committed-prefix stability is unaffected. Equations that
+  already fit keep the heuristic font.
+- Verification: 5 new tests (fit math, overflow shrink, no-op when fitting, floor);
+  frontend 548 tests in 62 files, backend 354, ESLint, Ruff, and the production build
+  pass. Local diagnostics replay of the retained Standing waves stream at 1440×900:
+  the equation now renders at 25.9 px with 258 px of ink in a 269 px box, fully visible.
+  No API call was made.
+- Still open from the smoke review: "Nodes: x = 0 and x = L" wraps mid-expression, and
+  the board's lower half stays empty.
+
+## 2026-10-18 — One owner-approved GPT-6.1 Sol lesson smoke
+
+- Exactly one paid `POST /lesson` call, no retry: topic "Standing waves" (a topic that
+  failed layout on the qualified Luna v2 batch), `gpt-6.1-sol`, `reasoning.effort: low`,
+  prompt v2 (`bdcb2d54…aaa5c`). Raw validated NDJSON is retained at
+  `artifacts/evidence/gpt61sol-smoke-20261018/standing-waves.ndjson`.
+- Result: 4 accepted steps, 0 repairs, 0 drops, 0 sanitized. Request to first valid step
+  **14.1 s**; request to `lesson.done` **32.5 s** (would have exceeded the old 30 s
+  timeout). The Luna/none baseline was 1.4–2.6 s to first step, so first-ink latency is
+  roughly 5–10× worse.
+- Local diagnostics review (no API call) at 1440×900: content is physically correct,
+  no text/ink collisions, clear separation of derivation (left) and graph (right). One
+  renderer defect: the equation `L=λ/2 ⇒ λ=2L` renders 330 px of KaTeX into a 269 px
+  box and is clipped to "λ = 2". Also "Nodes: x = 0 and x = L" wraps mid-expression,
+  and the lower half of the board is unused.
+- Token usage was not captured: uvicorn does not print `app.*` INFO logs. The backend now
+  attaches an INFO handler and logs `lesson_generation_usage` counts (no content), so the
+  next lesson records exact cost. Estimated cost of this call: ~1–2¢ (hard ceiling 7.4¢
+  from the 7,200-token output cap).
+
+## 2026-10-18 — Board model moved to GPT-6.1 Sol; Realtime memory widened
+
+- Owner-selected configuration after reviewing current OpenAI docs (GPT-6 family now
+  supersedes GPT-5.6): `BOARD_MODEL=gpt-6.1-sol`, `BOARD_REASONING_EFFORT=low`,
+  `BOARD_PROMPT_VERSION=v2`. Voice stays on `gpt-realtime-2.1-mini`. Motivation:
+  owner reported messy/wrong drawings and the tutor forgetting context.
+- Settings now allow `gpt-6.1-sol`, `gpt-6-luna`, and `gpt-6-astra` alongside the
+  GPT-5.6 tiers, and reject `none` for 6.1 Sol and Astra (upstream does not accept it).
+  The continuation schema model enum was widened to match.
+- Reasoning tokens count against `max_output_tokens`, so every board-model request
+  (lesson, continuation, repair, annotation, scratch, vision smoke) adds a 4,000-token
+  headroom at `low` and none at `none`. Lesson timeout default 30→45 s and
+  annotation/scratch 15→25 s to absorb reasoning latency.
+- Realtime memory: rolling `post_instructions` limit 4,000→16,000 tokens (model window is
+  128K) and the per-connection auto-disconnect budget 50,000→300,000 tokens. The old
+  budget was reached after a handful of exchanges because every response re-reads its
+  context, which reset the conversation.
+- The M3 evaluation harness intentionally stays pinned to `gpt-5.6-luna`/`none`; its
+  tests now construct that configuration explicitly instead of relying on defaults.
+- Verification: backend 353 tests, frontend 543 tests, ESLint, Ruff lint/format, and
+  the production build pass. No credentialed call was made: GPT-6.1 Sol lesson quality,
+  first-visible-ink latency, and per-lesson cost are unmeasured estimates (~6–10 s,
+  ~$0.025/lesson). The next smallest task is one owner-approved live lesson.
+
 ## 2026-07-19 — Generic renderer-sampled tangents added after the roadmap pass
 
 - Added schema **1.4** `tangent_at`: a line construction may target an already accepted

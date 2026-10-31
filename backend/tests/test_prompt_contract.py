@@ -11,6 +11,7 @@ from app.prompt_contract import (
     LESSON_PLAN_SCHEMA_PATH,
     LESSON_SCHEMA_PATH,
     LESSON_WIRE_CONTRACT_MARKER,
+    MAX_FIGURE_WIRE_CONTRACT_CHARS,
     MAX_LESSON_PLAN_CONTRACT_CHARS,
     MAX_LESSON_WIRE_CONTRACT_CHARS,
     expand_prompt_contract,
@@ -32,12 +33,16 @@ def test_generated_contract_is_bounded_deterministic_and_covers_every_op() -> No
 
     schema = json.loads(LESSON_SCHEMA_PATH.read_text(encoding="utf-8"))
     definitions = schema["$defs"]
+    figure_contract = lesson_wire_contract("v4")
     for reference in definitions["op"]["oneOf"]:
         op_schema = definitions[reference["$ref"].rsplit("/", 1)[-1]]
         variant_ref = op_schema.get("oneOf", [reference])[0]["$ref"]
         variant = definitions[variant_ref.rsplit("/", 1)[-1]]
         op_name = variant["properties"]["op"]["const"]
-        assert f"- {op_name}:" in contract
+        assert f"- {op_name}:" in contract or f"- {op_name}:" in figure_contract
+    # Prompts v1-v3 keep the schema-1.4 vocabulary byte for byte.
+    assert "figure" not in contract
+    assert hashlib.sha256(contract.encode()).hexdigest().startswith("589b4d285bfb9eb1")
 
     assert "[1..4]" in contract
     assert definitions["elementId"]["pattern"] in contract
@@ -111,3 +116,43 @@ def test_prompt_contract_rejects_duplicate_plan_markers() -> None:
     )
     with pytest.raises(ValueError, match="at most one lesson-plan"):
         expand_prompt_contract(template)
+
+
+def test_figure_contract_shows_one_coordinate_convention() -> None:
+    contract = lesson_wire_contract("v4")
+    assert contract == lesson_wire_contract("v4")
+    assert len(contract) <= MAX_FIGURE_WIRE_CONTRACT_CHARS
+    for op_name in ("text", "equation", "figure"):
+        assert f"- {op_name}:" in contract
+    for legacy in ("sketch", "axes", "curve", "diagram", "line", "arrow", "point", "angle_arc"):
+        assert f"- {legacy}:" not in contract
+    assert "normalizedPoint" not in contract
+    for kind in (
+        "point",
+        "segment",
+        "polyline",
+        "circle",
+        "arc",
+        "fn",
+        "param",
+        "polar",
+        "shade",
+        "angle",
+        "tangent",
+        "perpendicular",
+        "measure",
+        "text",
+        "group",
+    ):
+        assert f'kind:"{kind}"' in contract
+    assert "figurePoint = [x,y] OR {at:elementId}" in contract
+    # The checkpoint's limits are visible, so the model stops overrunning them.
+    assert "checkpoint:null|{question:string[1..120],expected_gist:string[1..80]}" in contract
+
+
+def test_v4_prompts_expand_the_figure_contract() -> None:
+    for name in ("board_engine_v4.md", "repair.md", "continue.md"):
+        expanded = lessons._prompt(name, "v4")
+        assert lesson_wire_contract("v4") in expanded
+        assert lesson_wire_contract() not in expanded
+        assert lessons._prompt_sha256(name, "v4") == hashlib.sha256(expanded.encode()).hexdigest()

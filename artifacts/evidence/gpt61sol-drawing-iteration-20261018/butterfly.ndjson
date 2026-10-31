@@ -1,0 +1,2 @@
+{"type":"lesson.started","request_id":"c54cc3bb-adfc-4966-8eb9-a05d5984328c","title":"Draw a butterfly"}
+{"type":"lesson.error","request_id":"c54cc3bb-adfc-4966-8eb9-a05d5984328c","code":"no_valid_steps","fallback_available":true,"failure_origin":"generation","repair_attempts":0}

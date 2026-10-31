@@ -1,0 +1,14 @@
+{
+  "schema": "chalk.drawing-suite-quality.v1",
+  "source": "frontend/gallery.html?dir=artifacts/evidence/suite40-v4r3-sol-20261021/ (production Board, 2026-10-21 renderer), 2026-10-21",
+  "boards": 40,
+  "clean": 27,
+  "issues": {
+    "overlap": 15,
+    "clipped_equation": 1,
+    "outside_board": 0,
+    "small_text": 0,
+    "short_last_line": 0
+  },
+  "mean_board_coverage": 0.248
+}

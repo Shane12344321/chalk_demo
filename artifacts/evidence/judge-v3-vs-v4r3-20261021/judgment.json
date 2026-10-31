@@ -1,0 +1,941 @@
+{
+ "schema": "chalk.board-judge.v1",
+ "method": "Blind pairwise judgment by 16 fresh Claude Sonnet subagents (medium effort), 5 pairs each, given only the topic, a 5-point rubric (correctness, idea visible, legibility, completeness, layout) and two 1600x900 board images. Every topic judged twice with sides swapped; a topic goes to a system that wins both orders or wins one and ties the other, otherwise even.",
+ "v3_boards": "artifacts/evidence/suite40-v3-sol-20261019 (2026-10-21 renderer)",
+ "v4_boards": "artifacts/evidence/suite40-v4r3-sol-20261021 (2026-10-21 renderer)",
+ "summary": {
+  "topics_v4": 26,
+  "topics_v3": 7,
+  "topics_even_split": 7,
+  "judgments_v4": 59,
+  "judgments_v3": 21,
+  "same_verdict_both_orders": 33,
+  "board1_share_of_picks": 0.512
+ },
+ "per_topic": {
+  "alg-absolute": "v3",
+  "alg-complete-square": "v4",
+  "alg-inequality": "v3",
+  "alg-slope-intercept": "v4",
+  "alg-system": "v4",
+  "calc-area": "v4",
+  "calc-between": "v4",
+  "calc-extrema": "v4",
+  "calc-riemann": "even (split)",
+  "calc-tangent": "v4",
+  "geo-bisector": "v4",
+  "geo-centroid": "v4",
+  "geo-pythagoras": "v4",
+  "geo-similar": "v3",
+  "geo-triangle-sum": "v4",
+  "mech-circular": "v4",
+  "mech-incline": "v4",
+  "mech-projectile": "even (split)",
+  "mech-torque": "v4",
+  "mech-vector-add": "even (split)",
+  "prob-complement": "v4",
+  "prob-geometric": "v4",
+  "prob-normal": "v4",
+  "prob-tree": "v4",
+  "prob-venn-union": "v4",
+  "shape-butterfly": "v3",
+  "shape-hexagon": "v3",
+  "shape-spiral": "v4",
+  "shape-star": "v3",
+  "shape-tessellation": "v4",
+  "trig-amplitude": "v4",
+  "trig-inscribed": "even (split)",
+  "trig-radians": "v3",
+  "trig-tangent-radius": "v4",
+  "trig-unit-circle": "even (split)",
+  "wave-doppler": "even (split)",
+  "wave-lens": "v4",
+  "wave-snell": "v4",
+  "wave-standing": "v4",
+  "wave-superposition": "even (split)"
+ },
+ "key": {
+  "A01": {
+   "topic_id": "mech-circular",
+   "board-1": "v4",
+   "board-2": "v3"
+  },
+  "A02": {
+   "topic_id": "shape-spiral",
+   "board-1": "v4",
+   "board-2": "v3"
+  },
+  "A03": {
+   "topic_id": "calc-riemann",
+   "board-1": "v4",
+   "board-2": "v3"
+  },
+  "A04": {
+   "topic_id": "geo-centroid",
+   "board-1": "v3",
+   "board-2": "v4"
+  },
+  "A05": {
+   "topic_id": "calc-between",
+   "board-1": "v3",
+   "board-2": "v4"
+  },
+  "A06": {
+   "topic_id": "shape-hexagon",
+   "board-1": "v4",
+   "board-2": "v3"
+  },
+  "A07": {
+   "topic_id": "calc-area",
+   "board-1": "v3",
+   "board-2": "v4"
+  },
+  "A08": {
+   "topic_id": "wave-doppler",
+   "board-1": "v3",
+   "board-2": "v4"
+  },
+  "A09": {
+   "topic_id": "calc-tangent",
+   "board-1": "v4",
+   "board-2": "v3"
+  },
+  "A10": {
+   "topic_id": "mech-projectile",
+   "board-1": "v3",
+   "board-2": "v4"
+  },
+  "A11": {
+   "topic_id": "mech-incline",
+   "board-1": "v4",
+   "board-2": "v3"
+  },
+  "A12": {
+   "topic_id": "prob-normal",
+   "board-1": "v3",
+   "board-2": "v4"
+  },
+  "A13": {
+   "topic_id": "geo-bisector",
+   "board-1": "v3",
+   "board-2": "v4"
+  },
+  "A14": {
+   "topic_id": "shape-tessellation",
+   "board-1": "v3",
+   "board-2": "v4"
+  },
+  "A15": {
+   "topic_id": "alg-system",
+   "board-1": "v4",
+   "board-2": "v3"
+  },
+  "A16": {
+   "topic_id": "prob-tree",
+   "board-1": "v3",
+   "board-2": "v4"
+  },
+  "A17": {
+   "topic_id": "alg-inequality",
+   "board-1": "v3",
+   "board-2": "v4"
+  },
+  "A18": {
+   "topic_id": "geo-similar",
+   "board-1": "v4",
+   "board-2": "v3"
+  },
+  "A19": {
+   "topic_id": "trig-radians",
+   "board-1": "v4",
+   "board-2": "v3"
+  },
+  "A20": {
+   "topic_id": "alg-slope-intercept",
+   "board-1": "v4",
+   "board-2": "v3"
+  },
+  "A21": {
+   "topic_id": "wave-superposition",
+   "board-1": "v3",
+   "board-2": "v4"
+  },
+  "A22": {
+   "topic_id": "trig-tangent-radius",
+   "board-1": "v3",
+   "board-2": "v4"
+  },
+  "A23": {
+   "topic_id": "mech-torque",
+   "board-1": "v3",
+   "board-2": "v4"
+  },
+  "A24": {
+   "topic_id": "mech-vector-add",
+   "board-1": "v3",
+   "board-2": "v4"
+  },
+  "A25": {
+   "topic_id": "prob-geometric",
+   "board-1": "v4",
+   "board-2": "v3"
+  },
+  "A26": {
+   "topic_id": "alg-complete-square",
+   "board-1": "v4",
+   "board-2": "v3"
+  },
+  "A27": {
+   "topic_id": "shape-star",
+   "board-1": "v4",
+   "board-2": "v3"
+  },
+  "A28": {
+   "topic_id": "calc-extrema",
+   "board-1": "v3",
+   "board-2": "v4"
+  },
+  "A29": {
+   "topic_id": "wave-lens",
+   "board-1": "v3",
+   "board-2": "v4"
+  },
+  "A30": {
+   "topic_id": "trig-inscribed",
+   "board-1": "v4",
+   "board-2": "v3"
+  },
+  "A31": {
+   "topic_id": "geo-pythagoras",
+   "board-1": "v3",
+   "board-2": "v4"
+  },
+  "A32": {
+   "topic_id": "trig-amplitude",
+   "board-1": "v3",
+   "board-2": "v4"
+  },
+  "A33": {
+   "topic_id": "geo-triangle-sum",
+   "board-1": "v3",
+   "board-2": "v4"
+  },
+  "A34": {
+   "topic_id": "prob-complement",
+   "board-1": "v4",
+   "board-2": "v3"
+  },
+  "A35": {
+   "topic_id": "shape-butterfly",
+   "board-1": "v3",
+   "board-2": "v4"
+  },
+  "A36": {
+   "topic_id": "wave-standing",
+   "board-1": "v3",
+   "board-2": "v4"
+  },
+  "A37": {
+   "topic_id": "alg-absolute",
+   "board-1": "v3",
+   "board-2": "v4"
+  },
+  "A38": {
+   "topic_id": "wave-snell",
+   "board-1": "v4",
+   "board-2": "v3"
+  },
+  "A39": {
+   "topic_id": "prob-venn-union",
+   "board-1": "v4",
+   "board-2": "v3"
+  },
+  "A40": {
+   "topic_id": "trig-unit-circle",
+   "board-1": "v4",
+   "board-2": "v3"
+  },
+  "B01": {
+   "topic_id": "mech-circular",
+   "board-1": "v3",
+   "board-2": "v4"
+  },
+  "B02": {
+   "topic_id": "shape-spiral",
+   "board-1": "v3",
+   "board-2": "v4"
+  },
+  "B03": {
+   "topic_id": "calc-riemann",
+   "board-1": "v3",
+   "board-2": "v4"
+  },
+  "B04": {
+   "topic_id": "geo-centroid",
+   "board-1": "v4",
+   "board-2": "v3"
+  },
+  "B05": {
+   "topic_id": "calc-between",
+   "board-1": "v4",
+   "board-2": "v3"
+  },
+  "B06": {
+   "topic_id": "shape-hexagon",
+   "board-1": "v3",
+   "board-2": "v4"
+  },
+  "B07": {
+   "topic_id": "calc-area",
+   "board-1": "v4",
+   "board-2": "v3"
+  },
+  "B08": {
+   "topic_id": "wave-doppler",
+   "board-1": "v4",
+   "board-2": "v3"
+  },
+  "B09": {
+   "topic_id": "calc-tangent",
+   "board-1": "v3",
+   "board-2": "v4"
+  },
+  "B10": {
+   "topic_id": "mech-projectile",
+   "board-1": "v4",
+   "board-2": "v3"
+  },
+  "B11": {
+   "topic_id": "mech-incline",
+   "board-1": "v3",
+   "board-2": "v4"
+  },
+  "B12": {
+   "topic_id": "prob-normal",
+   "board-1": "v4",
+   "board-2": "v3"
+  },
+  "B13": {
+   "topic_id": "geo-bisector",
+   "board-1": "v4",
+   "board-2": "v3"
+  },
+  "B14": {
+   "topic_id": "shape-tessellation",
+   "board-1": "v4",
+   "board-2": "v3"
+  },
+  "B15": {
+   "topic_id": "alg-system",
+   "board-1": "v3",
+   "board-2": "v4"
+  },
+  "B16": {
+   "topic_id": "prob-tree",
+   "board-1": "v4",
+   "board-2": "v3"
+  },
+  "B17": {
+   "topic_id": "alg-inequality",
+   "board-1": "v4",
+   "board-2": "v3"
+  },
+  "B18": {
+   "topic_id": "geo-similar",
+   "board-1": "v3",
+   "board-2": "v4"
+  },
+  "B19": {
+   "topic_id": "trig-radians",
+   "board-1": "v3",
+   "board-2": "v4"
+  },
+  "B20": {
+   "topic_id": "alg-slope-intercept",
+   "board-1": "v3",
+   "board-2": "v4"
+  },
+  "B21": {
+   "topic_id": "wave-superposition",
+   "board-1": "v4",
+   "board-2": "v3"
+  },
+  "B22": {
+   "topic_id": "trig-tangent-radius",
+   "board-1": "v4",
+   "board-2": "v3"
+  },
+  "B23": {
+   "topic_id": "mech-torque",
+   "board-1": "v4",
+   "board-2": "v3"
+  },
+  "B24": {
+   "topic_id": "mech-vector-add",
+   "board-1": "v4",
+   "board-2": "v3"
+  },
+  "B25": {
+   "topic_id": "prob-geometric",
+   "board-1": "v3",
+   "board-2": "v4"
+  },
+  "B26": {
+   "topic_id": "alg-complete-square",
+   "board-1": "v3",
+   "board-2": "v4"
+  },
+  "B27": {
+   "topic_id": "shape-star",
+   "board-1": "v3",
+   "board-2": "v4"
+  },
+  "B28": {
+   "topic_id": "calc-extrema",
+   "board-1": "v4",
+   "board-2": "v3"
+  },
+  "B29": {
+   "topic_id": "wave-lens",
+   "board-1": "v4",
+   "board-2": "v3"
+  },
+  "B30": {
+   "topic_id": "trig-inscribed",
+   "board-1": "v3",
+   "board-2": "v4"
+  },
+  "B31": {
+   "topic_id": "geo-pythagoras",
+   "board-1": "v4",
+   "board-2": "v3"
+  },
+  "B32": {
+   "topic_id": "trig-amplitude",
+   "board-1": "v4",
+   "board-2": "v3"
+  },
+  "B33": {
+   "topic_id": "geo-triangle-sum",
+   "board-1": "v4",
+   "board-2": "v3"
+  },
+  "B34": {
+   "topic_id": "prob-complement",
+   "board-1": "v3",
+   "board-2": "v4"
+  },
+  "B35": {
+   "topic_id": "shape-butterfly",
+   "board-1": "v4",
+   "board-2": "v3"
+  },
+  "B36": {
+   "topic_id": "wave-standing",
+   "board-1": "v4",
+   "board-2": "v3"
+  },
+  "B37": {
+   "topic_id": "alg-absolute",
+   "board-1": "v4",
+   "board-2": "v3"
+  },
+  "B38": {
+   "topic_id": "wave-snell",
+   "board-1": "v3",
+   "board-2": "v4"
+  },
+  "B39": {
+   "topic_id": "prob-venn-union",
+   "board-1": "v3",
+   "board-2": "v4"
+  },
+  "B40": {
+   "topic_id": "trig-unit-circle",
+   "board-1": "v3",
+   "board-2": "v4"
+  }
+ },
+ "verdicts": [
+  {
+   "pair": "A01",
+   "winner": "1",
+   "confidence": 2,
+   "reason": "Board 1 shows multiple velocity vectors, centripetal acceleration arrow, and a formula chain with constant-speed caveat. Board 2 has a sparse diagram, a misplaced 'net force' label, and no force arrow."
+  },
+  {
+   "pair": "A02",
+   "winner": "1",
+   "confidence": 3,
+   "reason": "Board 1 has a full spiral with labelled square sizes (1, 0.618, 0.382) and the exact-spiral relation. Board 2 has an incomplete spiral, no labels, and a stray 'quarter-turn' arc."
+  },
+  {
+   "pair": "A03",
+   "winner": "2",
+   "confidence": 2,
+   "reason": "Board 2 is correct and clean: x+1 with left rectangles, sum 6. Board 1 has inconsistent axes (2.2), rectangles misaligned to the curve, and an arithmetic mismatch."
+  },
+  {
+   "pair": "A04",
+   "winner": "2",
+   "confidence": 3,
+   "reason": "Board 2 has correctly drawn medians with labelled midpoints, equal-segment relations and the 2:1 ratio. Board 1 has mislabelled points (AB, BC, CA, E) and nonsensical medians."
+  },
+  {
+   "pair": "A05",
+   "winner": "2",
+   "confidence": 2,
+   "reason": "Board 2 shades the enclosed region, shows a vertical height strip, names both curves and the intersection solve. Board 1 is unshaded, with ambiguous labels and a missing curve legend."
+  },
+  {
+   "pair": "A06",
+   "winner": "2",
+   "confidence": 1,
+   "reason": "Board 2 has clean hexagon with six dashed lines through vertices and midpoints, plus fold-line explanation. Board 1 has stray extending dashes and circles cluttering, though it has a 3+3=6 equation."
+  },
+  {
+   "pair": "A07",
+   "winner": "2",
+   "confidence": 3,
+   "reason": "Board 2 shows shaded area under y=x^2 with Riemann strip, Δx, sum-to-integral, and correct 8/3. Board 1 is a trivial rectangle with a confusing stray arrow labeled area."
+  },
+  {
+   "pair": "A08",
+   "winner": "2",
+   "confidence": 2,
+   "reason": "Board 2 shows eccentric circles with source moving and ahead/behind labels with pitch. Board 1's circles are drawn enclosing the source oddly, source outside circles, mislabeled 'longer λ' at left."
+  },
+  {
+   "pair": "A09",
+   "winner": "1",
+   "confidence": 2,
+   "reason": "Board 1 shows secant PQ and tangent with rise/run, correct limit derivation and tangent equation. Board 2's rise/run triangle is oddly placed, not matching tangent, with the vertical line at x=2 mismatched."
+  },
+  {
+   "pair": "A10",
+   "winner": "1",
+   "confidence": 2,
+   "reason": "Board 1 is legible with velocity vectors at A, B, C, though labels are a bit messy. Board 2 is cramped with overlapping '10 m/s' text, and inconsistent values (+6/-6 vs 10)."
+  },
+  {
+   "pair": "A11",
+   "winner": "1",
+   "confidence": 1,
+   "reason": "Board 1 has the 30° angle with a numeric a=g/2 result. Both diagrams are cluttered. Board 2's mg sin θ label touches its arrow, but the general θ is nice."
+  },
+  {
+   "pair": "A12",
+   "winner": "2",
+   "confidence": 3,
+   "reason": "Board 2 has a labeled axis, shaded curve, σ markers and z-score formula. Board 1's sketch is unlabeled and its bracket lines floating under the curve show no regions."
+  },
+  {
+   "pair": "A13",
+   "winner": "2",
+   "confidence": 3,
+   "reason": "Board 2 shows the complete construction: A, B, M, P, Q, the bisector line, right-angle mark and equal d lengths. Board 1 shows only two crossing arcs with no bisector line."
+  },
+  {
+   "pair": "A14",
+   "winner": "2",
+   "confidence": 2,
+   "reason": "Board 2 is a larger tiling with 12 shaded triangles, 60° marked and clearly legible text. Board 1's hexagon of 6 triangles plus one on top is lopsided and its text is misaligned."
+  },
+  {
+   "pair": "A15",
+   "winner": "1",
+   "confidence": 2,
+   "reason": "Board 1 labels both lines, shows dashed guides to the intersection and has the full solve with the boxed answer. Board 2 has unlabeled lines and fewer steps."
+  },
+  {
+   "pair": "A16",
+   "winner": "2",
+   "confidence": 1,
+   "reason": "Board 2 has an H/T-labelled tree, circled HT/TH outcomes, a clear equation chain and takeaway; Board 1's branch labels are cluttered and the layout is bare."
+  },
+  {
+   "pair": "A17",
+   "winner": "1",
+   "confidence": 2,
+   "reason": "Board 1 has a clean number line with an open circle at 3 and shaded left arrow. Board 2's circles sit unclearly with no shading, and 2 is misplaced."
+  },
+  {
+   "pair": "A18",
+   "winner": "2",
+   "confidence": 2,
+   "reason": "Board 2 is clean with the right triangles and sides 3-4-5 vs 6-8-10 in matching orientation, plus a x2 arrow. Board 1 is cluttered with duplicate sides and a wrong ratio."
+  },
+  {
+   "pair": "A19",
+   "winner": "2",
+   "confidence": 2,
+   "reason": "Board 2 shows one clear sector with r, θ and s = 2π for 60°, which is correct. Board 1 has cluttered double circles, overlapping labels and a muddled 1 rad/2 rad arc."
+  },
+  {
+   "pair": "A20",
+   "winner": "1",
+   "confidence": 2,
+   "reason": "Board 1 shows the correct line y=2x+1, with intercept, rise/run steps and labelled points. Board 2's graph is mis-scaled with a stray horizontal line and only one labelled point."
+  },
+  {
+   "pair": "A21",
+   "winner": "1",
+   "confidence": 3,
+   "reason": "Board 1 correctly shows sin x + sin x = 2 sin x and sin x + (-sin x) = 0 with clear curves. Board 2 mislabels curves, shows a stray resultant, and has inconsistent peak labels."
+  },
+  {
+   "pair": "A22",
+   "winner": "2",
+   "confidence": 3,
+   "reason": "Board 1 draws an oval, not a circle, with a cramped right angle. Board 2 has a true circle, right-angle mark at T, and a dashed OP showing the shortest-distance argument."
+  },
+  {
+   "pair": "A23",
+   "winner": "2",
+   "confidence": 2,
+   "reason": "Board 2 shows the perpendicular lever arm with a dimension bar and rotation arrow. Board 1 has a force at the lever end with a dashed horizontal line that does not mark the arm."
+  },
+  {
+   "pair": "A24",
+   "winner": "1",
+   "confidence": 1,
+   "reason": "Both show a correct head-to-tail triangle. Board 1 has clear start/finish and explanatory text. Board 2 adds numeric components but its arrowheads are messy."
+  },
+  {
+   "pair": "A25",
+   "winner": "1",
+   "confidence": 2,
+   "reason": "Board 1 labels 'success' and 2r cleanly, and the formulas sit well. Board 2's '2r' label is garbled under the text 'about' and has a dangling line."
+  },
+  {
+   "pair": "A26",
+   "winner": "1",
+   "confidence": 3,
+   "reason": "Board 1 shows a complete, correctly labeled 4-region area model (x², 3x, 3x, 9) with a general formula; board 2 is incomplete, missing the 3x strips and shading."
+  },
+  {
+   "pair": "A27",
+   "winner": "2",
+   "confidence": 2,
+   "reason": "Board 2 is clean, with consecutive 72° arcs and listed rotation angles; board 1 has cluttered scribbled arrows and a 'center' label overlapping them."
+  },
+  {
+   "pair": "A28",
+   "winner": "2",
+   "confidence": 2,
+   "reason": "Board 2 adds a sign chart of f' and direction arrows on the curve, though 'local max/min' labels are misplaced; board 1 only has endpoint evaluations."
+  },
+  {
+   "pair": "A29",
+   "winner": "2",
+   "confidence": 2,
+   "reason": "Board 2's rays are correct, with the parallel ray through the far focus, the central ray straight through, and a clear inverted image; board 1 has overlapping labels and a wrongly drawn ray."
+  },
+  {
+   "pair": "A30",
+   "winner": "2",
+   "confidence": 2,
+   "reason": "Board 2 is clean with 60° and 120° angles correctly drawn; board 1 has a messy double arc, overlapping α/O labels and a misplaced 'intercepted arc' label."
+  },
+  {
+   "pair": "A31",
+   "winner": "2",
+   "confidence": 1,
+   "reason": "Board 2 shades all three squares with clear area labels 9, 16, 25 and right-angle mark. Board 1's hypotenuse square is unshaded and its area labels are tiny, with stray dots."
+  },
+  {
+   "pair": "A32",
+   "winner": "2",
+   "confidence": 2,
+   "reason": "Board 2 labels all three curves (2 sin x, sin 2x, reference) and keeps the equations tidy. Board 1's curves are unlabeled, so sin x versus the others is unclear, and its text sizes are inconsistent."
+  },
+  {
+   "pair": "A33",
+   "winner": "2",
+   "confidence": 2,
+   "reason": "Board 2 labels A, B, C and the parallel line, and its α and β are clearly matched on the line and in the triangle. Board 1's dotted arcs and α, β, γ placement are confusing."
+  },
+  {
+   "pair": "A34",
+   "winner": "1",
+   "confidence": 1,
+   "reason": "Board 1 shades the complement region and shows P(A)+P(Aᶜ)=1. Board 2's concrete dice example is clear but nothing visually marks the complement region."
+  },
+  {
+   "pair": "A35",
+   "winner": "1",
+   "confidence": 1,
+   "reason": "Board 1 shows a clean symmetric butterfly with P, M, P′ on a horizontal dashed segment. Board 2's wing lines cross and a horizontal line cuts through the head."
+  },
+  {
+   "pair": "A36",
+   "winner": "2",
+   "confidence": 2,
+   "reason": "Board 2 shows a clean sinusoidal string with marked A points, clear lambda/2 span and arrows; board 1's pointed diamond shapes are not sinusoidal, though A/N labels are fine."
+  },
+  {
+   "pair": "A37",
+   "winner": "1",
+   "confidence": 2,
+   "reason": "Board 1 has labeled number line with -3..3 ticks and arrows from zero to each point; board 2 lacks tick numbers and the 'zero distance' label is confusing."
+  },
+  {
+   "pair": "A38",
+   "winner": "1",
+   "confidence": 2,
+   "reason": "Board 1 shows worked substitution, notes higher index bends toward normal, with clean labels; board 2 has 'normal' label overlapping incident ray and cluttered labels."
+  },
+  {
+   "pair": "A39",
+   "winner": "1",
+   "confidence": 3,
+   "reason": "Board 1 is complete with outcomes 1-4 in regions, union notation and inclusion-exclusion formula; board 2 has only an unlabeled Venn and a title."
+  },
+  {
+   "pair": "A40",
+   "winner": "1",
+   "confidence": 3,
+   "reason": "Board 1 links point P and its height to the sine curve with marked key points and the pi/3 example; board 2 has no linkage and a bare curve."
+  },
+  {
+   "pair": "B01",
+   "winner": "2",
+   "confidence": 1,
+   "reason": "Board 2 shows velocity and acceleration at two points plus constant-speed vs velocity note; Board 1 has a misleading r arrow and 'net force' label, but is cleaner. Both somewhat messy."
+  },
+  {
+   "pair": "B02",
+   "winner": "2",
+   "confidence": 3,
+   "reason": "Board 2 shows a complete spiral through nested squares with side labels 1, 0.618, 0.382 and exact formula; Board 1 has a stray floating arc and an incomplete spiral."
+  },
+  {
+   "pair": "B03",
+   "winner": "2",
+   "confidence": 2,
+   "reason": "Board 2 has correct right-endpoint rectangles on x^2 with shaded area, overestimate label, and correct 3.75; Board 1 mislabels L3 (sum 6 uses right-endpoint values) and draws odd rectangles."
+  },
+  {
+   "pair": "B04",
+   "winner": "1",
+   "confidence": 3,
+   "reason": "Board 1 has labelled vertices, midpoints, medians meeting at G, equal-segment relations and 2:1 ratio; Board 2 has confusing stray labels (AB, BC, CA), unlabelled vertices, and no content."
+  },
+  {
+   "pair": "B05",
+   "winner": "1",
+   "confidence": 2,
+   "reason": "Board 1 shades region, shows vertical strip height, labels both curves, and derives integral from intersections; Board 2 lacks shading and curve labels, and its 'upper' label sits awkwardly."
+  },
+  {
+   "pair": "B06",
+   "winner": "1",
+   "confidence": 1,
+   "reason": "Both show 6 dashed lines in a hexagon. Board 1 lines stay inside the hexagon; board 2 has odd circle marks and lines poking out irregularly, and its hexagon is slightly squashed."
+  },
+  {
+   "pair": "B07",
+   "winner": "1",
+   "confidence": 3,
+   "reason": "Board 1 shows the shaded area under y=x^2 with a Riemann strip and the correct 8/3. Board 2 is a trivial rectangle with a confusing arrow and no curve."
+  },
+  {
+   "pair": "B08",
+   "winner": "2",
+   "confidence": 2,
+   "reason": "Board 2's circles are correctly offset, bunched ahead of the source, with clean labels and correct formulas. Board 1 has nested concentric-looking circles, a messy source, and 'ahead' and 'behind' placed confusingly."
+  },
+  {
+   "pair": "B09",
+   "winner": "2",
+   "confidence": 2,
+   "reason": "Board 2 shows the secant through P and Q, the tangent at P, and the limit derivation, so it conveys the idea. Board 1's triangle is wrong, with rise 2 and run 1 not matching the drawing."
+  },
+  {
+   "pair": "B10",
+   "winner": "1",
+   "confidence": 2,
+   "reason": "Board 1 has labelled axes, a numeric trajectory, and constant horizontal arrows with vertical arrows changing. Its labels overlap and the +6 and -6 values look inconsistent. Board 2's vectors are misplaced, with B's vertical arrow pointing down and wrong labels."
+  },
+  {
+   "pair": "B11",
+   "winner": "2",
+   "confidence": 1,
+   "reason": "Board 2 has a cleaner diagram with a proper component rectangle and no label clutter, and concrete 30° values. Board 1's mg sin θ label overlaps the arrow and its components are muddled."
+  },
+  {
+   "pair": "B12",
+   "winner": "1",
+   "confidence": 3,
+   "reason": "Board 1 has an axis-labeled bell curve with σ markers and shaded 68%. Board 2's bars below the curve are unlabeled and don't connect to the curve, so the rule isn't shown."
+  },
+  {
+   "pair": "B13",
+   "winner": "1",
+   "confidence": 3,
+   "reason": "Board 1 shows the complete construction: lens arcs, P and Q, the bisector line, midpoint M, a right-angle mark, and equal d marks. Board 2 shows only four disconnected arcs and a segment."
+  },
+  {
+   "pair": "B14",
+   "winner": "1",
+   "confidence": 2,
+   "reason": "Board 1 shows a shaded star tiling with a 60° angle and a 6x60 explanation. Board 2 shows only a hexagon of six triangles, which makes the same point more weakly."
+  },
+  {
+   "pair": "B15",
+   "winner": "2",
+   "confidence": 2,
+   "reason": "Board 2 labels both lines on the graph and drops dashed guides to the intersection. It also shows the full algebra and a boxed answer, whereas board 1 leaves the lines unlabeled."
+  },
+  {
+   "pair": "B16",
+   "winner": "1",
+   "confidence": 1,
+   "reason": "Board 1 shows 1/2 on branches with a clear HT/TH highlight and the multiply/add rule. Board 2's tree is clean, but its label and equation placement are plainer and it has no rule statement."
+  },
+  {
+   "pair": "B17",
+   "winner": "2",
+   "confidence": 3,
+   "reason": "Board 2 draws a clear open circle at 3 with a shaded leftward arrow. Board 1's circles are tiny and misplaced, with no ray, and it mislabels the 3 position."
+  },
+  {
+   "pair": "B18",
+   "winner": "1",
+   "confidence": 3,
+   "reason": "Board 1 is clean, with correct 3-4-5 vs 6-8-10 sides and a x2 arrow. Board 2 is cluttered with doubled lines and wrong labels (4 and 5 on one side, 8 and 10 swapped)."
+  },
+  {
+   "pair": "B19",
+   "winner": "1",
+   "confidence": 3,
+   "reason": "Board 1 shows a correct 60-degree sector, s = 2π cm and a clean worked example. Board 2 has a messy double circle, overlapping labels and an inconsistent 1 rad / 2 rad drawing."
+  },
+  {
+   "pair": "B20",
+   "winner": "2",
+   "confidence": 2,
+   "reason": "Board 2 shows the rise/run steps with plotted points, and its line passes through (0,1) with correct values. Board 1's line misses (0,1), and its stray segment and axis labels are incorrect. Board 2's labels are somewhat cluttered."
+  },
+  {
+   "pair": "B21",
+   "winner": "1",
+   "confidence": 1,
+   "reason": "Board 1 shows unequal-amplitude waves with resultant 1.6 and 0.4 labelled, but axis and label placement are messy. Board 2 is clean yet leaves the waves unlabelled."
+  },
+  {
+   "pair": "B22",
+   "winner": "1",
+   "confidence": 3,
+   "reason": "Board 1 draws a proper circle with tangent, radius, right angle, and a point P showing OP > r, plus reasoning. Board 2's circle is a distorted ellipse with minimal content."
+  },
+  {
+   "pair": "B23",
+   "winner": "1",
+   "confidence": 1,
+   "reason": "Board 1 has a labelled lever, force, perpendicular distance, rotation arrow, and a calculation. Board 2 is clean too but lacks a rotation arrow, and its dashed line is confusing."
+  },
+  {
+   "pair": "B24",
+   "winner": "1",
+   "confidence": 1,
+   "reason": "Board 1 gives a numeric example with components that matches the triangle's labelled vectors a, b, a+b. Board 2 has no numbers and misses a few labels, though it is clear."
+  },
+  {
+   "pair": "B25",
+   "winner": "2",
+   "confidence": 2,
+   "reason": "Board 2 is tidy and legible, with the success region and 2r side labelled. Board 1's 2r label collides with the caption text and its layout is cramped."
+  },
+  {
+   "pair": "B26",
+   "winner": "2",
+   "confidence": 3,
+   "reason": "Board 2 shows the full area model (x², two 3x strips, 9) with the correct -9 result and general formula; Board 1 is incomplete, wrongly gives -4, and has no 3x labels."
+  },
+  {
+   "pair": "B27",
+   "winner": "1",
+   "confidence": 1,
+   "reason": "Board 1 has a clean star with 72° arcs and a center label, plus listed rotation angles; Board 2's inner arrows and dashed lines are messy, with 'center' text overlapped."
+  },
+  {
+   "pair": "B28",
+   "winner": "1",
+   "confidence": 2,
+   "reason": "Board 1 adds a sign table, f' sign arrows on the curve, and local max/min labels; Board 2 is sparser and has the labels only in small text."
+  },
+  {
+   "pair": "B29",
+   "winner": "1",
+   "confidence": 2,
+   "reason": "Board 1's rays are correct and clean (parallel ray, central ray, image inverted at 2F). Board 2 has text overlapping the ray, a wrong-looking ray path, and a cluttered axis."
+  },
+  {
+   "pair": "B30",
+   "winner": "2",
+   "confidence": 1,
+   "reason": "Board 2 adds the intercepted arc and α/2α labeling, which show why the theorem holds. Board 1 is clean but has only the numeric 60° and 120°."
+  },
+  {
+   "pair": "B31",
+   "winner": "1",
+   "confidence": 2,
+   "reason": "All three squares shaded and labeled 9, 16, 25 with side lengths; board 2 leaves the 25 square empty with stray dots, weakening the visual area comparison."
+  },
+  {
+   "pair": "B32",
+   "winner": "1",
+   "confidence": 2,
+   "reason": "Board 1 labels each curve and shows period marker plus a thin reference sine; board 2 has unlabeled curves, a mislabeled (π/4,1) point and tiny inconsistent equation text."
+  },
+  {
+   "pair": "B33",
+   "winner": "1",
+   "confidence": 2,
+   "reason": "Board 1 clearly shows alpha and beta at A and B matched at C with a parallel line, boxed result; board 2 labels are cramped and gamma overlaps arc."
+  },
+  {
+   "pair": "B34",
+   "winner": "2",
+   "confidence": 1,
+   "reason": "Board 2 shades the complement region, labels 'not A', and links to P(Ac)=1-P(A); board 1 is clear with elements but lacks shading and probability link."
+  },
+  {
+   "pair": "B35",
+   "winner": "2",
+   "confidence": 2,
+   "reason": "Board 2 shows clean symmetric wings with P, M, P' equal-distance construction; board 1 has overlapping lines through the body, odd stray '2' labels and messy wing shapes."
+  },
+  {
+   "pair": "B36",
+   "winner": "1",
+   "confidence": 2,
+   "reason": "Smooth sinusoidal loops with clear N/A circles and lambda/4 and lambda/2 brackets. Board 2 draws pointed triangular diamonds, which misrepresent the string shape, and its lambda/4 bracket is misplaced."
+  },
+  {
+   "pair": "B37",
+   "winner": "2",
+   "confidence": 2,
+   "reason": "Board 2 has a full labelled number line (-3 to 3) with arrows showing distance from zero. Board 1 has no tick numbers and a confusing 'zero distance' label."
+  },
+  {
+   "pair": "B38",
+   "winner": "2",
+   "confidence": 2,
+   "reason": "Board 2's diagram is cleaner and adds the 'higher index toward the normal' takeaway. Board 1 has labels overlapping the ray ('normal', 'boundary', 'transmitted') and clutter."
+  },
+  {
+   "pair": "B39",
+   "winner": "2",
+   "confidence": 3,
+   "reason": "Board 2 has the union formula, numbered outcomes in regions (4 outside), and a 'count once' arrow at the overlap. Board 1 has only an unlabelled Venn and a title, with no formulas."
+  },
+  {
+   "pair": "B40",
+   "winner": "1",
+   "confidence": 1,
+   "reason": "Board 1 is cleaner and correct, though the circle is a squashed ellipse. Board 2 mislabels (3pi/2,-1) at 2pi, shows axis 1.4/6.5, and crowds the circle, with a misplaced dashed projection."
+  }
+ ]
+}

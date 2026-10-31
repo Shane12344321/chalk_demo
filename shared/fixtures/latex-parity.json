@@ -1,5 +1,5 @@
 {
-  "$comment": "Shared browser/backend contract for equation acceptance. The browser (frontend/src/board/latex.ts, KaTeX strict mode with trust disabled) is the rendering authority; backend/app/latex_lint.py must agree on every case so repair fires before an unrenderable equation is streamed. Accept cases include every equation in the cached and golden lesson corpus. Reject reasons are structural (unknown command, unbalanced group, unpaired \\left, math-mode dollar, forbidden command) because those are the classes KaTeX strict mode fails on.",
+  "$comment": "Shared browser/backend contract for equation acceptance. The browser (frontend/src/board/latex.ts, KaTeX strict mode with trust disabled) is the rendering authority; backend/app/latex_lint.py must agree on every case so repair fires before an unrenderable equation is streamed. Accept cases include every equation in the cached and golden lesson corpus. Reject reasons are structural (unknown command or environment, unbalanced group, unpaired \\left, math-mode dollar, forbidden command) because those are the classes KaTeX strict mode fails on.",
   "cases": [
     { "name": "corpus-exponential-decay", "latex": "A=A_0e^{kt}", "expect": "accept" },
     { "name": "corpus-projectile-range", "latex": "R = \\frac{v_0^2}{g}\\sin(2\\theta)", "expect": "accept" },
@@ -27,6 +27,20 @@
     { "name": "math-mode-dollar", "latex": "$x$", "expect": "reject" },
     { "name": "unpaired-left", "latex": "\\left(\\frac{1}{2}", "expect": "reject" },
     { "name": "forbidden-def", "latex": "\\def\\x{1}x", "expect": "reject" },
-    { "name": "forbidden-href", "latex": "\\href{https://example.com}{x}", "expect": "reject" }
+    { "name": "forbidden-href", "latex": "\\href{https://example.com}{x}", "expect": "reject" },
+    { "name": "katex-relations", "latex": "a \\le b \\ne c \\ge d", "expect": "accept" },
+    { "name": "katex-sets-logic", "latex": "A \\cap B \\subseteq A \\cup B,\\ \\forall x \\in A", "expect": "accept" },
+    { "name": "katex-therefore", "latex": "\\therefore x \\approx 2", "expect": "accept" },
+    { "name": "katex-binomial", "latex": "\\binom{n}{k} = \\frac{n!}{k!\\,(n-k)!}", "expect": "accept" },
+    { "name": "katex-piecewise", "latex": "|x| = \\begin{cases} x & x \\ge 0 \\\\ -x & x < 0 \\end{cases}", "expect": "accept" },
+    { "name": "katex-matrix", "latex": "\\det \\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix} = ad - bc", "expect": "accept" },
+    { "name": "katex-floor-norm", "latex": "\\lfloor x \\rfloor \\le x,\\ \\lVert v \\rVert", "expect": "accept" },
+    { "name": "katex-evaluated-at", "latex": "\\left. \\frac{dy}{dx} \\right|_{x=1} = 2", "expect": "accept" },
+    { "name": "katex-reaction-arrow", "latex": "A \\xrightarrow{k} B \\rightleftharpoons C", "expect": "accept" },
+    { "name": "katex-cancel", "latex": "\\frac{\\cancel{2}x}{\\cancel{2}} = x", "expect": "accept" },
+    { "name": "katex-hbar-ell", "latex": "\\ell = 2,\\ E = \\hbar\\omega", "expect": "accept" },
+    { "name": "unknown-environment", "latex": "\\begin{tabular}{c} a \\end{tabular}", "expect": "reject" },
+    { "name": "unknown-environment-eqnarray", "latex": "\\begin{eqnarray} a = b \\end{eqnarray}", "expect": "reject" },
+    { "name": "unknown-command-csch", "latex": "\\csch x", "expect": "reject" }
   ]
 }

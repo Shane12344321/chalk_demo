@@ -220,7 +220,7 @@ async def _request_model_output(
             }
         ],
         "reasoning": {"effort": settings.board_reasoning_effort},
-        "max_output_tokens": MAX_SCRATCH_OUTPUT_TOKENS,
+        "max_output_tokens": MAX_SCRATCH_OUTPUT_TOKENS + settings.board_output_token_headroom,
         "store": False,
     }
     try:

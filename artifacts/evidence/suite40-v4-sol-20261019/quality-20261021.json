@@ -1,0 +1,24 @@
+{
+  "schema": "chalk.drawing-suite-quality.v1",
+  "source": "frontend/gallery.html?dir=artifacts/evidence/suite40-v4-sol-20261019/ re-rendered offline on 2026-10-21 with the board-intelligence round (label layer + halo, outward figure labels, square right angles, measured 0.6em label advance, dash-aware title wrap); same NDJSON, no new model calls",
+  "boards": 40,
+  "clean": 32,
+  "issues": {
+    "overlap": 9,
+    "clipped_equation": 0,
+    "outside_board": 0,
+    "small_text": 0,
+    "short_last_line": 0
+  },
+  "mean_board_coverage": 0.242,
+  "dirty": {
+    "alg-slope-intercept": "graph overlaps triangle (29%)",
+    "geo-pythagoras": "length overlaps hyp (54%)",
+    "geo-similar": "triangles overlaps lengths (81%)",
+    "mech-circular": "motion overlaps inward (16%)",
+    "mech-incline": "forces overlaps components (19%); components overlaps motion (33%)",
+    "mech-vector-add": "vectors overlaps resultant (39%)",
+    "trig-radians": "circlefig overlaps values (33%)",
+    "wave-standing": "string overlaps nodes (21%)"
+  }
+}

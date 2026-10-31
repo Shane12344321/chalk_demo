@@ -17,6 +17,7 @@ from app.lesson_validation import (
     LessonValidationState,
     StepValidationError,
     validate_step,
+    validate_step_with_sanitization,
 )
 
 FIXTURE_DIR = Path(__file__).resolve().parents[2] / "shared/fixtures"
@@ -124,7 +125,7 @@ def test_equation_steps_run_the_latex_lint() -> None:
         validate_step(step, state)
 
 
-def test_checkpoint_budget_is_one_per_lesson() -> None:
+def test_checkpoint_budget_drops_a_later_checkpoint_without_a_repair() -> None:
     state = LessonValidationState()
     checkpoint = {"question": "Ready?", "expected_gist": "yes"}
     first = {
@@ -139,9 +140,13 @@ def test_checkpoint_budget_is_one_per_lesson() -> None:
         "ops": [{"op": "text", "id": "t2", "region": "A2", "content": "Two"}],
         "checkpoint": checkpoint,
     }
-    validate_step(first, state)
-    with pytest.raises(StepValidationError, match="checkpoint budget"):
-        validate_step(second, state)
+    assert validate_step(first, state)["checkpoint"] == checkpoint
+    accepted = validate_step_with_sanitization(second, state)
+    assert accepted.step["checkpoint"] is None
+    assert accepted.step["ops"] == second["ops"]
+    assert accepted.sanitization.corrections == ("dropped_extra_checkpoint",)
+    assert accepted.sanitization.correction_count == 1
+    assert second["checkpoint"] == checkpoint
 
 
 def test_whitespace_script_is_rejected() -> None:
@@ -182,3 +187,44 @@ def test_nested_power_is_rejected_before_materializing_the_exponent() -> None:
     }
     with pytest.raises(StepValidationError, match="exponent exceeds"):
         validate_step(curve_step(case), state)
+
+
+@pytest.mark.parametrize(
+    ("latex", "category"),
+    [
+        ("\\foo{2}", "latex_command"),
+        ("\\begin{tabular}{c} a \\end{tabular}", "latex_environment"),
+        ("\\frac{1}{2", "latex_braces"),
+        ("$x$", "latex_dollar"),
+        ("\\left(\\frac{1}{2}", "latex_left_right"),
+        ("\\def\\x{1}x", "latex_forbidden"),
+    ],
+)
+def test_latex_repairs_are_logged_by_cause(latex: str, category: str) -> None:
+    from app.lessons import _issue_category
+
+    issues = lint_equation_latex(latex)
+    assert issues
+    assert _issue_category(issues[0]) == category
+
+
+@pytest.mark.parametrize(
+    "checkpoint",
+    [
+        {"question": "Is it rising?", "expected_gist": "x" * 81},
+        {"question": "Q" * 121, "expected_gist": "rising"},
+        {"question": "Is it rising?", "expected_gist": "rising", "answer": "yes"},
+        "Is it rising?",
+    ],
+)
+def test_invalid_checkpoint_is_dropped_without_a_repair(checkpoint: object) -> None:
+    step = {
+        "id": "s1",
+        "script": "Watch the curve rise.",
+        "ops": [{"op": "text", "id": "t1", "region": "A1", "content": "Rising"}],
+        "checkpoint": checkpoint,
+    }
+    accepted = validate_step_with_sanitization(step, LessonValidationState())
+    assert accepted.step["checkpoint"] is None
+    assert accepted.sanitization.corrections == ("dropped_invalid_checkpoint",)
+    assert step["checkpoint"] == checkpoint

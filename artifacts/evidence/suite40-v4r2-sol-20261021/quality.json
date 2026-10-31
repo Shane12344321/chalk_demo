@@ -1,0 +1,25 @@
+{
+  "schema": "chalk.drawing-suite-quality.v1",
+  "source": "frontend/gallery.html?dir=artifacts/evidence/suite40-v4r2-sol-20261021/ (production Board after the 2026-10-21 board-intelligence round), 2026-10-21",
+  "boards": 40,
+  "clean": 31,
+  "issues": {
+    "overlap": 9,
+    "clipped_equation": 0,
+    "outside_board": 0,
+    "small_text": 0,
+    "short_last_line": 0
+  },
+  "mean_board_coverage": 0.247,
+  "dirty": {
+    "alg-inequality": "solution_marks overlaps check_point (15%)",
+    "calc-area": "resultmark overlaps positive (16%)",
+    "geo-triangle-sum": "parallel overlaps straight (46%)",
+    "mech-incline": "forces overlaps components (40%)",
+    "prob-complement": "outcomes overlaps values (50%)",
+    "prob-normal": "wider overlaps central (100%)",
+    "prob-tree": "branches overlaps probabilities (24%)",
+    "trig-amplitude": "waves overlaps compress (12%)",
+    "trig-radians": "circlefig overlaps values (18%)"
+  }
+}

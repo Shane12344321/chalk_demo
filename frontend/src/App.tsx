@@ -784,7 +784,7 @@ function App() {
           }
           setActiveLesson({
             lesson: {
-              schemaVersion: "1.4",
+              schemaVersion: "1.5",
               title: progress.title,
               steps: progress.steps,
             },
@@ -940,7 +940,7 @@ function App() {
               }
               const nextLesson: NormalizedLesson = {
                 ...resolvedLesson,
-                schemaVersion: "1.4",
+                schemaVersion: "1.5",
                 steps: [...resolvedLesson.steps, continuation.step],
               };
               premeasureLessonRoots(measurementCacheRef.current!, [continuation.step]);

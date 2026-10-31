@@ -12,6 +12,9 @@ SanitizationCode = Literal[
     "normalized_power_operator",
     "clamped_anchor_gap",
     "clamped_normalized_point",
+    # Recorded by the step validator, never by `sanitize_step`.
+    "dropped_extra_checkpoint",
+    "dropped_invalid_checkpoint",
 ]
 
 CLAMP_TOLERANCE = 0.05
@@ -47,6 +50,15 @@ class SanitizationResult:
     value: Any
     corrections: tuple[SanitizationCode, ...]
     correction_count: int
+
+    def with_correction(self, code: SanitizationCode) -> SanitizationResult:
+        """The same evidence plus one more correction."""
+
+        return SanitizationResult(
+            self.value,
+            self.corrections if code in self.corrections else (*self.corrections, code),
+            min(MAX_RECORDED_CORRECTIONS, self.correction_count + 1),
+        )
 
 
 class _Recorder:

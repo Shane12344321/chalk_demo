@@ -185,7 +185,7 @@ describe("lesson NDJSON streaming", () => {
         request_id: REQUEST_ID,
         code: "step_sanitized",
         step_hint: "s1",
-        corrections: ["trimmed_outer_whitespace", "clamped_normalized_point"],
+        corrections: ["trimmed_outer_whitespace", "clamped_normalized_point", "dropped_extra_checkpoint"],
         correction_count: 3,
       }),
       envelope({ type: "lesson.step", request_id: REQUEST_ID, step }),

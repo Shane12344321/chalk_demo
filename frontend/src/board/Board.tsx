@@ -1,7 +1,8 @@
-import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
+import { Fragment, useEffect, useId, useLayoutEffect, useMemo, useRef } from "react";
 import "katex/dist/katex.min.css";
 import type { NormalizedLesson } from "./decode";
-import { type BoardGeometry, type BoardPath } from "./geometry";
+import { configuredScenePipeline, type ScenePipeline } from "./boardRendererConfig";
+import { type BoardGeometry } from "./geometry";
 import { BOARD_HEIGHT, BOARD_WIDTH } from "./layout";
 import {
   type VisibleBoardState,
@@ -10,9 +11,12 @@ import { OverlayLayer, type DeixisOverlay } from "./overlays";
 import { AnnotationOverlayLayer } from "./annotationOverlays";
 import type { AnnotationOp } from "../annotations";
 import { fitBoardText } from "./textLayout";
+import { FittedEquation } from "./FittedEquation";
 import { type LayoutLintIssue } from "./layoutLint";
-import { revealGroupProgress } from "./reveal";
+import { revealGroupProgress, strokeRevealProgress } from "./reveal";
 import { RoughSvgBoardRenderer, type BoardRenderContext } from "./renderer";
+import { morphAt } from "./scene/morph";
+import { interpolate } from "./scene/motion";
 import { measureRenderedBoard } from "./measuredLayout";
 import type { PrecommitMeasurementCache } from "./precommitMeasurement";
 
@@ -31,6 +35,8 @@ export interface BoardProps {
   onMeasuredLayoutFindings?: (findings: readonly LayoutLintIssue[]) => void;
   measurementCache?: PrecommitMeasurementCache;
   renderContext?: BoardRenderContext;
+  /** Geometry pipeline; defaults to `VITE_CHALK_SCENE` (legacy unless set to `scene`). */
+  scenePipeline?: ScenePipeline;
 }
 
 export function Board({
@@ -48,10 +54,14 @@ export function Board({
   onMeasuredLayoutFindings,
   measurementCache,
   renderContext,
+  scenePipeline,
 }: BoardProps) {
   const svgRef = useRef<SVGSVGElement>(null);
+  const pipeline = scenePipeline ?? configuredScenePipeline(import.meta.env.VITE_CHALK_SCENE);
   const rendererRef = useRef<RoughSvgBoardRenderer>();
-  if (!rendererRef.current) rendererRef.current = new RoughSvgBoardRenderer(measurementCache);
+  if (rendererRef.current?.pipeline !== pipeline) {
+    rendererRef.current = new RoughSvgBoardRenderer(measurementCache, pipeline);
+  }
   const renderer = rendererRef.current;
   const prepared = useMemo(
     () => renderer.prepareLesson(lesson, renderContext),
@@ -134,15 +144,11 @@ export function Board({
         </defs>
         <rect width={BOARD_WIDTH} height={BOARD_HEIGHT} rx="36" fill="transparent" />
         <path className="board-ghost-line" d="M48 300 H1552 M48 576 H1552" />
-        {build.geometries.map((geometry) => {
-          const progress = renderer.geometryProgress(
-            prepared,
-            geometry,
-            currentStepIndex,
-            currentStepProgress,
-          );
-          return <BoardGeometryLayer key={geometry.id} geometry={geometry} progress={progress} />;
-        })}
+        <BoardInk
+          geometries={build.geometries}
+          progressOf={(geometry) =>
+            renderer.geometryProgress(prepared, geometry, currentStepIndex, currentStepProgress)}
+        />
         <AnnotationOverlayLayer ops={annotations} elements={visibleSnapshot.elements} />
         <OverlayLayer
           overlays={overlays}
@@ -181,51 +187,76 @@ function layoutIssueSummary(
     .join(", ");
 }
 
-const AXIS_LABEL_REVEAL_PROGRESS = 0.85;
-const DIAGRAM_LABEL_REVEAL_PROGRESS = 0.72;
-
-export function BoardGeometryLayer({ geometry, progress }: { geometry: BoardGeometry; progress: number }) {
-  if (progress <= 0) return null;
-  const clipId = `reveal-${geometry.id}`;
-  const fittedText = geometry.text ? fitBoardText(geometry.text, geometry.box) : undefined;
-  // A hand writes labels after drawing the axes, not during the strokes.
-  const isDiagram = ["diagram", "line", "arrow", "point", "angle_arc"].includes(geometry.kind);
-  const labelsVisible = geometry.kind === "axes"
-    ? progress >= AXIS_LABEL_REVEAL_PROGRESS
-    : !isDiagram || progress >= DIAGRAM_LABEL_REVEAL_PROGRESS;
+/**
+ * Every element at its progress. A transform's source is hidden once the
+ * morph starts; until then it stays on the board as committed ink.
+ */
+export function BoardInk({
+  geometries,
+  progressOf,
+}: {
+  geometries: readonly BoardGeometry[];
+  progressOf: (geometry: BoardGeometry) => number;
+}) {
+  const progress = geometries.map(progressOf);
+  const replaced = new Set(
+    geometries.flatMap((geometry, index) =>
+      geometry.takesOver && progress[index] > 0 ? [geometry.takesOver] : []),
+  );
   return (
-    <g data-element-id={geometry.id} data-kind={geometry.kind} data-progress={progress.toFixed(3)}>
-      <clipPath id={clipId}>
-        <rect
-          x={geometry.box.x - 8}
-          y={geometry.box.y - 8}
-          width={(geometry.box.width + 16) * progress}
-          height={geometry.box.height + 16}
-        />
-      </clipPath>
-      {geometry.paths.map((path, index) => {
-    const revealProgress = pathRevealProgress(geometry, path, progress);
-        return (
-        <path
-          data-board-mark="ink"
-          key={`${geometry.id}-path-${index}`}
-          d={path.d}
-          fill={path.fill}
-          filter="url(#chalk-softness)"
-          pathLength={1}
-          stroke={path.stroke}
-          strokeDasharray="1"
-          strokeDashoffset={1 - revealProgress}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={path.strokeWidth}
-        />
-        );
-      })}
+    <>
+      {geometries.map((geometry, index) =>
+        replaced.has(geometry.id) ? null : (
+          <BoardGeometryLayer
+            key={geometry.id}
+            geometry={geometry}
+            progress={progress[index]}
+            labels="layer"
+          />
+        ))}
+      {/* Labels sit above every stroke, with a halo in the board colour, so ink
+          drawn by a later step passes behind a label instead of through it. */}
+      <g data-board-layer="labels">
+        {geometries.map((geometry, index) =>
+          replaced.has(geometry.id) ? null : (
+            <BoardLabelLayer key={geometry.id} geometry={geometry} progress={progress[index]} />
+          ))}
+      </g>
+    </>
+  );
+}
+
+/** Everything a label needs to render at this progress, shared by both label placements. */
+function labelFrame(geometry: BoardGeometry, progress: number) {
+  const frame = interpolate(geometry.motion, progress);
+  const motionCreate = geometry.motion?.kind === "create" ? geometry.motion : undefined;
+  const drawn = geometry.motion ? frame.draw : progress;
+  // A hand writes labels after drawing the axes, not during the strokes.
+  const isDiagram = ["diagram", "line", "arrow", "point", "angle_arc", "figure"].includes(geometry.kind);
+  const labelsVisible = geometry.kind === "axes"
+    ? drawn >= AXIS_LABEL_REVEAL_PROGRESS
+    : !isDiagram || drawn >= DIAGRAM_LABEL_REVEAL_PROGRESS;
+  const center = [geometry.box.x + geometry.box.width / 2, geometry.box.y + geometry.box.height / 2];
+  const motionAttributes = {
+    ...(frame.opacity === 1 ? {} : { opacity: frame.opacity }),
+    ...(frame.scale === 1
+      ? {}
+      : {
+          transform: `translate(${center[0]} ${center[1]}) scale(${frame.scale}) translate(${-center[0]} ${-center[1]})`,
+        }),
+  };
+  return { frame, motionCreate, drawn, isDiagram, labelsVisible, motionAttributes };
+}
+
+function GeometryLabels({ geometry, progress }: { geometry: BoardGeometry; progress: number }) {
+  const { motionCreate, drawn, isDiagram, labelsVisible } = labelFrame(geometry, progress);
+  const clipId = `reveal-${geometry.id}`;
+  return (
+    <>
       {geometry.labels.map((label, index) => {
         const visible = label.revealGroup === undefined
           ? labelsVisible
-          : revealGroupProgress(geometry.paths, label.revealGroup, progress) >= 0.55;
+          : revealGroupProgress(geometry.paths, label.revealGroup, drawn, motionCreate?.rate, motionCreate?.lag) >= 0.55;
         return visible ? (
             <text
               data-auto-place={label.autoPlace ? "true" : "false"}
@@ -242,6 +273,111 @@ export function BoardGeometryLayer({ geometry, progress }: { geometry: BoardGeom
             </text>
           ) : null;
       })}
+    </>
+  );
+}
+
+/** One element's labels in the board's top label layer. */
+export function BoardLabelLayer({ geometry, progress }: { geometry: BoardGeometry; progress: number }) {
+  if (progress <= 0 || geometry.labels.length === 0) return null;
+  const { frame, motionAttributes } = labelFrame(geometry, progress);
+  // Mid-morph the morph stroke stands in for the element; labels wait for it to land.
+  if (geometry.morph && frame.morph !== undefined) return null;
+  return (
+    <g data-label-for={geometry.id} {...motionAttributes}>
+      <GeometryLabels geometry={geometry} progress={progress} />
+    </g>
+  );
+}
+
+const AXIS_LABEL_REVEAL_PROGRESS = 0.85;
+const DIAGRAM_LABEL_REVEAL_PROGRESS = 0.72;
+
+export function BoardGeometryLayer({
+  geometry,
+  progress,
+  labels = "inline",
+}: {
+  geometry: BoardGeometry;
+  progress: number;
+  /** `layer`: labels render in the board's top label layer instead (see BoardInk). */
+  labels?: "inline" | "layer";
+}) {
+  // Board-unique: a page may show several boards that reuse element IDs.
+  const maskPrefix = `holes-${useId().replace(/[^a-zA-Z0-9_-]/gu, "")}`;
+  if (progress <= 0) return null;
+  // Motion is a pure function of op progress (Manim's interpolate(alpha)), so
+  // a frozen board shows exactly the frame it will resume from.
+  const frame = interpolate(geometry.motion, progress);
+  if (geometry.morph && frame.morph !== undefined) {
+    return (
+      <g data-element-id={geometry.id} data-kind={geometry.kind} data-progress={progress.toFixed(3)} data-motion="transform">
+        <path
+          data-board-mark="ink"
+          d={morphAt(geometry.morph, frame.morph)}
+          fill="none"
+          filter="url(#chalk-softness)"
+          stroke={geometry.morph.stroke}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={geometry.morph.strokeWidth}
+        />
+      </g>
+    );
+  }
+  const { motionCreate, drawn, motionAttributes } = labelFrame(geometry, progress);
+  const clipId = `reveal-${geometry.id}`;
+  const fittedText = geometry.text ? fitBoardText(geometry.text, geometry.box) : undefined;
+  return (
+    <g
+      data-element-id={geometry.id}
+      data-kind={geometry.kind}
+      data-progress={progress.toFixed(3)}
+      {...motionAttributes}
+    >
+      <clipPath id={clipId}>
+        <rect
+          x={geometry.box.x - 8}
+          y={geometry.box.y - 8}
+          width={(geometry.box.width + 16) * drawn}
+          height={geometry.box.height + 16}
+        />
+      </clipPath>
+      {geometry.paths.map((path, index) => {
+    const revealProgress = strokeRevealProgress(
+      geometry.paths,
+      path,
+      drawn,
+      motionCreate?.rate,
+      motionCreate?.lag,
+    );
+    const maskId = `${maskPrefix}-${index}`;
+        return (
+        <Fragment key={`${geometry.id}-path-${index}`}>
+          {path.holes ? (
+            <mask id={maskId} maskUnits="userSpaceOnUse" x={0} y={0} width={BOARD_WIDTH} height={BOARD_HEIGHT}>
+              <rect x={0} y={0} width={BOARD_WIDTH} height={BOARD_HEIGHT} fill="white" />
+              {path.holes.map((hole, holeIndex) => <path key={holeIndex} d={hole} fill="black" />)}
+            </mask>
+          ) : null}
+          <path
+            data-board-mark="ink"
+            d={path.d}
+            fill={path.fill}
+            filter="url(#chalk-softness)"
+            mask={path.holes ? `url(#${maskId})` : undefined}
+            pathLength={1}
+            stroke={path.stroke}
+            strokeDasharray="1"
+            strokeDashoffset={1 - revealProgress}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={path.strokeWidth}
+          />
+        </Fragment>
+        );
+      })}
+      {labels === "inline" ? <GeometryLabels geometry={geometry} progress={progress} /> : null}
       {fittedText ? (
         <text
           className="board-hand-text"
@@ -270,35 +406,14 @@ export function BoardGeometryLayer({ geometry, progress }: { geometry: BoardGeom
           width={geometry.box.width}
           height={geometry.box.height}
         >
-          <div
+          <FittedEquation
+            key={`${geometry.equationHtml}|${geometry.equationFontSize ?? 31}|${geometry.box.width}x${geometry.box.height}`}
             className="board-equation"
-            style={{ fontSize: `${geometry.equationFontSize ?? 31}px` }}
-            // This markup is produced by KaTeX with trust disabled after a
-            // CHALK command allowlist; raw model HTML never reaches this sink.
-            dangerouslySetInnerHTML={{ __html: geometry.equationHtml }}
+            fontSize={geometry.equationFontSize ?? 31}
+            html={geometry.equationHtml}
           />
         </foreignObject>
       ) : null}
     </g>
   );
-}
-
-
-function pathRevealProgress(
-  geometry: BoardGeometry,
-  path: BoardPath,
-  progress: number,
-): number {
-  if (path.revealGroup === undefined) return easeInOut(clampPathProgress(progress));
-  return revealGroupProgress(geometry.paths, path.revealGroup, progress);
-}
-
-function clampPathProgress(value: number): number {
-  return Math.min(1, Math.max(0, value));
-}
-
-// Strokes accelerate out of the start and settle into the end the way a hand
-// does; endpoints stay exact so freeze/commit semantics are unchanged.
-function easeInOut(value: number): number {
-  return value < 0.5 ? 4 * value * value * value : 1 - (-2 * value + 2) ** 3 / 2;
 }

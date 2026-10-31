@@ -1,5 +1,6 @@
-import type { BoardGeometry, BoardLabel } from "./geometry";
-import { BOARD_HEIGHT, BOARD_WIDTH, type LayoutBox } from "./layout";
+import type { BoardGeometry } from "./geometry";
+import { geometryInk, InkIndex, labelBounds } from "./scene/labelSolver";
+import { BOARD_HEIGHT, BOARD_WIDTH, overlapRatio, type LayoutBox } from "./layout";
 import { fitBoardText } from "./textLayout";
 
 export type LayoutLintCode =
@@ -105,13 +106,15 @@ export function lintBoardGeometry(
   geometries: readonly BoardGeometry[],
 ): LayoutLintIssue[] {
   const issues: LayoutLintIssue[] = [];
+  // The same stroke-level ink model the label solver uses, across every element.
+  const ink = new InkIndex();
+  for (const geometry of geometries) for (const polyline of geometryInk(geometry)) ink.add(polyline);
   const labels = geometries.flatMap((geometry) =>
     geometry.labels.map((label) => ({
       elementId: geometry.id,
-      autoPlace: label.autoPlace ?? false,
-      box: labelBox(label),
-      boundary: geometry.canvasBox ?? boardBoundary(),
-      inkBounds: geometry.inkBounds ?? [],
+      solverPlaced: (label.mobility ?? (label.autoPlace ? "free" : "fixed")) !== "fixed",
+      box: labelBounds(label),
+      boundary: boardBoundary(),
     })),
   );
 
@@ -120,10 +123,7 @@ export function lintBoardGeometry(
     if (!containsWithTolerance(label.boundary, label.box)) {
       issues.push({ code: "label_out_of_bounds", elementIds: [label.elementId] });
     }
-    if (
-      label.autoPlace &&
-      label.inkBounds.some((inkBox) => overlapRatio(label.box, inkBox) > MATERIAL_OVERLAP_RATIO)
-    ) {
+    if (label.solverPlaced && ink.hits(label.box) > 0) {
       issues.push({ code: "label_ink_overlap", elementIds: [label.elementId] });
     }
     for (let right = left + 1; right < labels.length; right += 1) {
@@ -146,23 +146,6 @@ export function lintBoardGeometry(
   return issues;
 }
 
-function labelBox(label: BoardLabel): LayoutBox {
-  const fontSize = label.fontSize ?? 31;
-  const characterWidth = fontSize * 0.58;
-  const width = Math.max(fontSize * 0.65, label.text.length * characterWidth);
-  const x = label.anchor === "middle"
-    ? label.x - width / 2
-    : label.anchor === "end"
-      ? label.x - width
-      : label.x;
-  return {
-    x,
-    y: label.y - fontSize,
-    width,
-    height: fontSize * 1.25,
-  };
-}
-
 function boardBoundary(): LayoutBox {
   return { x: 0, y: 0, width: BOARD_WIDTH, height: BOARD_HEIGHT };
 }
@@ -174,17 +157,4 @@ function containsWithTolerance(boundary: LayoutBox, box: LayoutBox): boolean {
     box.x + box.width <= boundary.x + boundary.width + BOUNDARY_TOLERANCE &&
     box.y + box.height <= boundary.y + boundary.height + BOUNDARY_TOLERANCE
   );
-}
-
-function overlapRatio(left: LayoutBox, right: LayoutBox): number {
-  const width = Math.max(
-    0,
-    Math.min(left.x + left.width, right.x + right.width) - Math.max(left.x, right.x),
-  );
-  const height = Math.max(
-    0,
-    Math.min(left.y + left.height, right.y + right.height) - Math.max(left.y, right.y),
-  );
-  const smallerArea = Math.min(left.width * left.height, right.width * right.height);
-  return smallerArea === 0 ? 0 : (width * height) / smallerArea;
 }

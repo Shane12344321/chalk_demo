@@ -38,7 +38,11 @@ from app.lesson_validation import (
     validate_envelope,
     validate_step_with_sanitization,
 )
-from app.prompt_contract import LESSON_WIRE_CONTRACT_MARKER, expand_prompt_contract
+from app.prompt_contract import (
+    LESSON_WIRE_CONTRACT_MARKER,
+    ContractVersion,
+    expand_prompt_contract,
+)
 from app.renderer_identity import drawing_contract_identity
 from app.resolved_scene import validate_lesson_plan, validate_resolved_scene
 from app.sessions import CanonicalUuid4, _safety_identifier
@@ -177,8 +181,12 @@ async def create_lesson(
             "X-Content-Type-Options": "nosniff",
             "X-Chalk-Board-Model": settings.board_model,
             "X-Chalk-Board-Reasoning-Effort": settings.board_reasoning_effort,
-            "X-Chalk-Board-Prompt-SHA256": _prompt_sha256(settings.board_prompt_name),
-            "X-Chalk-Repair-Prompt-SHA256": _prompt_sha256("repair.md"),
+            "X-Chalk-Board-Prompt-SHA256": _prompt_sha256(
+                settings.board_prompt_name, settings.board_contract_version
+            ),
+            "X-Chalk-Repair-Prompt-SHA256": _prompt_sha256(
+                "repair.md", settings.board_contract_version
+            ),
             "X-Chalk-Continuation-Prompt-SHA256": continuation_metadata[
                 "continuation_prompt_sha256"
             ],
@@ -374,9 +382,13 @@ def _continuation_metadata(settings: Settings) -> dict[str, str]:
     metadata = {
         "board_model": settings.board_model,
         "board_reasoning_effort": settings.board_reasoning_effort,
-        "board_prompt_sha256": _prompt_sha256(settings.board_prompt_name),
-        "repair_prompt_sha256": _prompt_sha256("repair.md"),
-        "continuation_prompt_sha256": _prompt_sha256("continue.md"),
+        "board_prompt_sha256": _prompt_sha256(
+            settings.board_prompt_name, settings.board_contract_version
+        ),
+        "repair_prompt_sha256": _prompt_sha256("repair.md", settings.board_contract_version),
+        "continuation_prompt_sha256": _prompt_sha256(
+            "continue.md", settings.board_contract_version
+        ),
     }
     configuration_identity = {
         **metadata,
@@ -572,7 +584,7 @@ async def _request_continuation_step(
             },
             json={
                 "model": settings.board_model,
-                "instructions": _prompt("continue.md"),
+                "instructions": _prompt("continue.md", settings.board_contract_version),
                 "input": [
                     {
                         "role": "user",
@@ -597,7 +609,7 @@ async def _request_continuation_step(
                     }
                 ],
                 "reasoning": {"effort": settings.board_reasoning_effort},
-                "max_output_tokens": 1_600,
+                "max_output_tokens": 1_600 + settings.board_output_token_headroom,
                 "store": False,
             },
             timeout=httpx.Timeout(settings.lesson_generation_timeout_seconds),
@@ -832,7 +844,7 @@ async def _stream_model_lines(
     }
     body = {
         "model": settings.board_model,
-        "instructions": _prompt(settings.board_prompt_name),
+        "instructions": _prompt(settings.board_prompt_name, settings.board_contract_version),
         "input": [
             {
                 "role": "user",
@@ -857,7 +869,7 @@ async def _stream_model_lines(
             }
         ],
         "reasoning": {"effort": settings.board_reasoning_effort},
-        "max_output_tokens": MAX_OUTPUT_TOKENS,
+        "max_output_tokens": MAX_OUTPUT_TOKENS + settings.board_output_token_headroom,
         "store": False,
         "stream": True,
     }
@@ -893,6 +905,7 @@ async def _stream_model_lines(
                                 yield line
                         elif event_type == "response.completed":
                             completed = True
+                            _log_usage(payload.request_id, settings, event)
                         else:
                             failure = _terminal_failure(event)
                             if failure is not None:
@@ -910,6 +923,7 @@ async def _stream_model_lines(
                             yield line
                     elif event_type == "response.completed":
                         completed = True
+                        _log_usage(payload.request_id, settings, event)
                     else:
                         failure = _terminal_failure(event)
                         if failure is not None:
@@ -949,6 +963,13 @@ async def _accept_or_repair(
             issues = ["line is not one complete JSON object"]
         except StepValidationError as error:
             issues = error.issues
+        # Closed categories only (never issue text, IDs, or model content), so
+        # repair causes can be measured without retaining what the model wrote.
+        logger.info(
+            "lesson_step_invalid request_id=%s categories=%s",
+            payload.request_id,
+            ",".join(sorted({_issue_category(issue) for issue in issues})),
+        )
         if repair_attempts >= allowed_repairs:
             return None, repair_attempts, None
         repair_attempts += 1
@@ -982,7 +1003,7 @@ async def _repair_step(
     assert api_key is not None
     body = {
         "model": settings.board_model,
-        "instructions": _prompt("repair.md"),
+        "instructions": _prompt("repair.md", settings.board_contract_version),
         "input": [
             {
                 "role": "user",
@@ -1003,7 +1024,7 @@ async def _repair_step(
         # JSON object, but the checked-in schema and semantic validator—not an
         # upstream formatting mode—remain the authority for every repair.
         "reasoning": {"effort": settings.board_reasoning_effort},
-        "max_output_tokens": 1_200,
+        "max_output_tokens": 1_200 + settings.board_output_token_headroom,
         "store": False,
     }
     headers = {
@@ -1029,7 +1050,10 @@ async def _repair_step(
     if len(response.content) > MAX_REPAIR_OUTPUT_BYTES:
         raise _GenerationFailure("invalid_stream", origin="repair")
     try:
-        return _extract_output_text(response.json())
+        repaired = response.json()
+        # Token counts only, so repairs show up in per-lesson cost evidence.
+        _log_usage(payload.request_id, settings, {"response": repaired})
+        return _extract_output_text(repaired)
     except (ValueError, TypeError, json.JSONDecodeError):
         raise _GenerationFailure("invalid_stream", origin="repair") from None
 
@@ -1168,6 +1192,70 @@ def _error_envelope(
     )
 
 
+_ISSUE_CATEGORIES: tuple[tuple[str, str], ...] = (
+    ("not an earlier mark", "figure_reference"),
+    ("is not a ", "figure_mark_kind"),
+    ("is not an accepted figure", "figure_on"),
+    ("visible samples", "curve_invisible"),
+    ("expression", "expression"),
+    ("already used on the board", "duplicate_id"),
+    ("duplicate", "duplicate_id"),
+    ("at most", "budget"),
+    ("must increase", "range"),
+    ("not one complete JSON object", "json"),
+    # Equation lint (latex_lint.py), split by cause so repairs can be traced
+    # to the allowlist, the environment list, or malformed input.
+    ("unknown latex command", "latex_command"),
+    ("unknown latex environment", "latex_environment"),
+    ("forbidden latex", "latex_forbidden"),
+    ("braces are unbalanced", "latex_braces"),
+    ("must not contain $", "latex_dollar"),
+    ("has no matching \\right", "latex_left_right"),
+    ("anchor", "reference"),
+    ("not already accepted", "reference"),
+    ("latex", "latex"),
+    ("script", "script"),
+    ("checkpoint", "checkpoint"),
+    ("layout", "layout"),
+    ("is not valid under any of the given schemas", "schema"),
+    ("Additional properties", "schema"),
+    ("is a required property", "schema"),
+)
+
+
+def _issue_category(issue: str) -> str:
+    for needle, category in _ISSUE_CATEGORIES:
+        if needle in issue:
+            return category
+    return "schema" if issue.startswith("/") else "other"
+
+
+def _log_usage(request_id: str, settings: Settings, event: dict[str, Any]) -> None:
+    """Log token counts only, so per-lesson cost can be measured without content."""
+
+    response = event.get("response")
+    usage = response.get("usage") if isinstance(response, dict) else None
+    if not isinstance(usage, dict):
+        return
+
+    def count(key: str, detail_key: str | None = None) -> int:
+        value = usage.get(key)
+        if detail_key is not None:
+            value = value.get(detail_key) if isinstance(value, dict) else None
+        return value if isinstance(value, int) and not isinstance(value, bool) else 0
+
+    logger.info(
+        "lesson_generation_usage request_id=%s model=%s input_tokens=%d cached_input_tokens=%d "
+        "output_tokens=%d reasoning_tokens=%d",
+        request_id,
+        settings.board_model,
+        count("input_tokens"),
+        count("input_tokens_details", "cached_tokens"),
+        count("output_tokens"),
+        count("output_tokens_details", "reasoning_tokens"),
+    )
+
+
 def _terminal_failure(event: dict[str, Any]) -> _GenerationFailure | None:
     event_type = event.get("type")
     if event_type == "response.incomplete":
@@ -1243,14 +1331,14 @@ def _step_hint(raw_line: str) -> dict[str, str]:
     return {}
 
 
-def _prompt(name: str) -> str:
+def _prompt(name: str, contract_version: ContractVersion = "v3") -> str:
     template = (PROMPT_DIR / name).read_text(encoding="utf-8")
-    if name in {"board_engine.md", "repair.md", "continue.md"}:
-        return expand_prompt_contract(template)
+    if name in {"board_engine.md", "board_engine_v4.md", "repair.md", "continue.md"}:
+        return expand_prompt_contract(template, contract_version)
     if LESSON_WIRE_CONTRACT_MARKER in template:
         raise ValueError("legacy prompt unexpectedly contains a schema contract marker")
     return template
 
 
-def _prompt_sha256(name: str) -> str:
-    return hashlib.sha256(_prompt(name).encode()).hexdigest()
+def _prompt_sha256(name: str, contract_version: ContractVersion = "v3") -> str:
+    return hashlib.sha256(_prompt(name, contract_version).encode()).hexdigest()

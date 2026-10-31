@@ -209,9 +209,9 @@ def test_annotation_endpoint_returns_only_validated_schema_and_safe_headers() ->
         == hashlib.sha256(f"{SALT}:{CLIENT_ID}".encode()).hexdigest()
     )
     upstream = json.loads(captured.read())
-    assert upstream["model"] == "gpt-5.6-luna"
-    assert upstream["reasoning"] == {"effort": "none"}
-    assert upstream["max_output_tokens"] == 1_200
+    assert upstream["model"] == "gpt-6.1-sol"
+    assert upstream["reasoning"] == {"effort": "low"}
+    assert upstream["max_output_tokens"] == 1_200 + 4_000
     assert upstream["store"] is False
     annotation_input = json.loads(upstream["input"][0]["content"])
     assert annotation_input["annotation_open_sides"] == {

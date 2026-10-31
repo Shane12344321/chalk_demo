@@ -97,6 +97,46 @@ describe("Board", () => {
     expect(onFirstVisibleInk).toHaveBeenCalledOnce();
   });
 
+  it("masks shaded holes with mask IDs unique to each board", () => {
+    const venn = decodeLesson({
+      schema_version: "1.5",
+      title: "Complement",
+      steps: [
+        {
+          id: "s1",
+          script: "Everything outside A.",
+          ops: [
+            {
+              op: "figure",
+              id: "venn",
+              region: "right",
+              frame: { x: [-4.5, 4.5], y: [-3, 3] },
+              marks: [
+                { kind: "polyline", id: "sample", points: [[-4, -2.5], [4, -2.5], [4, 2.5], [-4, 2.5]], closed: true },
+                { kind: "circle", id: "event", center: [-1, 0], r: 1.5 },
+                { kind: "shade", inside: "sample", except: ["event"] },
+              ],
+            },
+          ],
+          checkpoint: null,
+        },
+      ],
+    }).lesson!;
+    const view = render(
+      <>
+        <Board lesson={venn} currentStepIndex={0} currentStepProgress={1} phase="QA" />
+        <Board lesson={venn} currentStepIndex={0} currentStepProgress={1} phase="QA" />
+      </>,
+    );
+    const masked = [...view.container.querySelectorAll("path[mask]")];
+    expect(masked).toHaveLength(2);
+    const ids = masked.map((path) => /^url\(#(.+)\)$/u.exec(path.getAttribute("mask")!)![1]);
+    expect(new Set(ids).size).toBe(2);
+    for (const id of ids) {
+      expect(view.container.querySelectorAll(`mask[id="${id}"] path[fill="black"]`)).toHaveLength(1);
+    }
+  });
+
   it("renders a complete shared-canvas physics diagram through the SVG board", () => {
     const physics = decodeLesson(physicsDiagramLesson()).lesson!;
     const view = render(
@@ -106,6 +146,6 @@ describe("Board", () => {
     expect(view.container.querySelectorAll('[data-element-id="normal"] path').length).toBeGreaterThan(4);
     expect(view.container.querySelectorAll('[data-element-id="incident"] path').length).toBeGreaterThan(2);
     expect(view.container.querySelector('[data-element-id="hit"]')).not.toBeNull();
-    expect(view.container.querySelector('[data-element-id="theta"]')?.textContent).toContain("θ");
+    expect(view.container.querySelector('[data-label-for="theta"]')?.textContent).toContain("θ");
   });
 });

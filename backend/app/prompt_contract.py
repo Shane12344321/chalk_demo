@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from functools import lru_cache
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 LESSON_SCHEMA_PATH = PROJECT_ROOT / "shared/schema/lesson.schema.json"
@@ -17,13 +17,34 @@ LESSON_PLAN_CONTRACT_MARKER = "{{LESSON_PLAN_CONTRACT}}"
 # so a later schema expansion still fails loudly rather than silently bloating
 # every board-model request.
 MAX_LESSON_WIRE_CONTRACT_CHARS = 4_720
+# Prompt v4 shows only text, equation, and the schema-1.5 figure vocabulary.
+MAX_FIGURE_WIRE_CONTRACT_CHARS = 3_700
 MAX_LESSON_PLAN_CONTRACT_CHARS = 1_000
+ContractVersion = Literal["v3", "v4"]
+# Prompts v1-v3 keep the schema-1.4 vocabulary byte for byte; figures are v4-only.
+LEGACY_CONTRACT_OPS = frozenset(
+    {
+        "text",
+        "equation",
+        "sketch",
+        "axes",
+        "curve",
+        "diagram",
+        "line",
+        "arrow",
+        "point",
+        "angle_arc",
+    }
+)
+FIGURE_CONTRACT_OPS = ("text", "equation", "figure")
 
 
-@lru_cache(maxsize=1)
-def lesson_wire_contract() -> str:
+@lru_cache(maxsize=2)
+def lesson_wire_contract(version: ContractVersion = "v3") -> str:
     """Return a compact, stable model-facing contract derived from the schema."""
 
+    if version == "v4":
+        return _figure_wire_contract()
     schema = json.loads(LESSON_SCHEMA_PATH.read_text(encoding="utf-8"))
     definitions = schema["$defs"]
     step = definitions["step"]
@@ -90,12 +111,69 @@ def lesson_wire_contract() -> str:
     ]
 
     for op_name, variants in _op_variants(definitions):
+        if op_name not in LEGACY_CONTRACT_OPS:
+            continue
         shapes = " OR ".join(_object_shape(variant, definitions) for variant in variants)
         lines.append(f"  - {op_name}: {shapes}")
 
     contract = "\n".join(lines)
     if len(contract) > MAX_LESSON_WIRE_CONTRACT_CHARS:
         raise ValueError("generated lesson wire contract exceeds prompt budget")
+    return contract
+
+
+def _figure_wire_contract() -> str:
+    """Schema-1.5 contract: one coordinate convention (figure frames, y up)."""
+
+    schema = json.loads(LESSON_SCHEMA_PATH.read_text(encoding="utf-8"))
+    definitions = schema["$defs"]
+
+    def variants(name: str) -> str:
+        return " OR ".join(
+            "[x,y]"
+            if item.get("$ref") == "#/$defs/figureRange"
+            else _object_shape(_resolve(item, definitions), definitions)
+            for item in definitions[name]["oneOf"]
+        )
+
+    leaf = " OR ".join(
+        _object_shape(_resolve(item, definitions), definitions)
+        for item in definitions["figureLeafMark"]["oneOf"]
+    )
+    lines = [
+        "Wire contract (generated from shared/schema/lesson.schema.json, schema 1.5):",
+        (
+            f"- A lesson accepts at most {schema['properties']['steps']['maxItems']} steps. "
+            f"Each step is exactly {_object_shape(definitions['step'], definitions)}."
+        ),
+        f"- elementId = string matching `{definitions['elementId']['pattern']}`.",
+        f"- region = {_enum(definitions['region']['enum'])}.",
+        f"- anchor = {_object_shape(definitions['anchor'], definitions)}.",
+        f"- strokeStyle = {_enum(definitions['strokeStyle']['enum'])}.",
+        "- figureRange = [number,number] with the first below the second.",
+        f"- figureFrame = {_object_shape(definitions['figureFrame'], definitions)}.",
+        f"- figurePoint = {variants('figurePoint')}.",
+        f"- figureLeafMark = {leaf}.",
+        "- figureMark = figureLeafMark OR "
+        f"{_object_shape(definitions['figureGroupMark'], definitions)}.",
+        "- Ops are exact JSON objects (a `?` suffix marks an optional key):",
+    ]
+    by_name = dict(_op_variants(definitions))
+    for op_name in FIGURE_CONTRACT_OPS:
+        shapes = " OR ".join(_object_shape(variant, definitions) for variant in by_name[op_name])
+        lines.append(f"  - {op_name}: {shapes}")
+    contract = (
+        "\n".join(lines)
+        # Spelled out here: an undefined `checkpoint` hid its length limits.
+        .replace(
+            "checkpoint:null|checkpoint",
+            f"checkpoint:null|{_object_shape(definitions['checkpoint'], definitions)}",
+        )
+        .replace("figureNumber", "number")
+        .replace("number[-∞..1000000]", "number>0")
+    )
+    if len(contract) > MAX_FIGURE_WIRE_CONTRACT_CHARS:
+        raise ValueError("generated figure wire contract exceeds prompt budget")
     return contract
 
 
@@ -117,7 +195,7 @@ def lesson_plan_contract() -> str:
     return contract
 
 
-def expand_prompt_contract(template: str) -> str:
+def expand_prompt_contract(template: str, version: ContractVersion = "v3") -> str:
     """Expand the required lesson marker and optional lesson-plan marker."""
 
     count = template.count(LESSON_WIRE_CONTRACT_MARKER)
@@ -126,7 +204,7 @@ def expand_prompt_contract(template: str) -> str:
     plan_count = template.count(LESSON_PLAN_CONTRACT_MARKER)
     if plan_count > 1:
         raise ValueError("schema-derived prompt must contain at most one lesson-plan marker")
-    expanded = template.replace(LESSON_WIRE_CONTRACT_MARKER, lesson_wire_contract())
+    expanded = template.replace(LESSON_WIRE_CONTRACT_MARKER, lesson_wire_contract(version))
     if plan_count == 1:
         expanded = expanded.replace(LESSON_PLAN_CONTRACT_MARKER, lesson_plan_contract())
     if LESSON_WIRE_CONTRACT_MARKER in expanded or LESSON_PLAN_CONTRACT_MARKER in expanded:

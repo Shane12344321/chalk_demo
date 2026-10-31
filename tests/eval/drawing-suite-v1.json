@@ -1,0 +1,64 @@
+{
+  "schema": "chalk.drawing-suite.v1",
+  "frozen": "2026-10-19",
+  "note": "Fixed general-drawing evaluation suite (docs/exec-plans/active/general-drawing.md, Phase 5). Topics and required features were written before any prompt-v4 work and must not be tuned against. Calibrated once after the 8-topic v3 pilot (2026-10-19): wave-standing no longer requires `plot`, because a string diagram without axes is a correct board. `requires` lists what a teacher's board for the topic must show, from a closed vocabulary checked on the compiled scene: plot (a frame with axes), curve (function-like curve), region (shaded area), round (circle, ellipse, or arc), polygon (closed straight shape), vector (arrow), angle (angle marker), point (marked point), line (straight segment). `name:n` means at least n.",
+  "categories": [
+    "calculus-graphs",
+    "trig-circles",
+    "geometry",
+    "vectors-mechanics",
+    "waves-optics",
+    "probability-sets",
+    "algebra-number-lines",
+    "shapes-symmetry"
+  ],
+  "topics": [
+    { "id": "calc-tangent", "category": "calculus-graphs", "topic": "Derivative as the slope of the tangent line", "requires": ["plot", "curve", "line", "point"] },
+    { "id": "calc-area", "category": "calculus-graphs", "topic": "Definite integral as the area under a curve", "requires": ["plot", "curve", "region"] },
+    { "id": "calc-riemann", "category": "calculus-graphs", "topic": "Riemann sums: approximating area with rectangles", "requires": ["plot", "curve", "polygon:3"] },
+    { "id": "calc-extrema", "category": "calculus-graphs", "topic": "Local maximum and minimum of a cubic function", "requires": ["plot", "curve", "point:2"] },
+    { "id": "calc-between", "category": "calculus-graphs", "topic": "Area between two curves", "requires": ["plot", "curve:2", "region"] },
+
+    { "id": "trig-unit-circle", "category": "trig-circles", "topic": "Unit circle and the sine wave", "requires": ["round", "angle", "plot", "curve"] },
+    { "id": "trig-radians", "category": "trig-circles", "topic": "Radians: arc length on a circle", "requires": ["round", "angle", "line"] },
+    { "id": "trig-inscribed", "category": "trig-circles", "topic": "Inscribed angle theorem", "requires": ["round", "angle", "point:3"] },
+    { "id": "trig-amplitude", "category": "trig-circles", "topic": "Graphs of y = 2 sin x and y = sin 2x compared", "requires": ["plot", "curve:2"] },
+    { "id": "trig-tangent-radius", "category": "trig-circles", "topic": "A tangent to a circle is perpendicular to the radius", "requires": ["round", "line:2", "angle"] },
+
+    { "id": "geo-pythagoras", "category": "geometry", "topic": "Pythagorean theorem with squares on each side", "requires": ["polygon:4"] },
+    { "id": "geo-triangle-sum", "category": "geometry", "topic": "Angles in a triangle add up to 180 degrees", "requires": ["polygon", "angle:3"] },
+    { "id": "geo-bisector", "category": "geometry", "topic": "Constructing the perpendicular bisector of a segment", "requires": ["line:2", "point:2", "round"] },
+    { "id": "geo-similar", "category": "geometry", "topic": "Similar triangles have proportional sides", "requires": ["polygon:2"] },
+    { "id": "geo-centroid", "category": "geometry", "topic": "The centroid is where the medians of a triangle meet", "requires": ["polygon", "line:3", "point"] },
+
+    { "id": "mech-vector-add", "category": "vectors-mechanics", "topic": "Adding two vectors head to tail", "requires": ["vector:3"] },
+    { "id": "mech-incline", "category": "vectors-mechanics", "topic": "Free-body diagram of a block on an incline", "requires": ["polygon", "vector:3", "angle"] },
+    { "id": "mech-projectile", "category": "vectors-mechanics", "topic": "Projectile motion: horizontal and vertical velocity", "requires": ["curve", "vector:2"] },
+    { "id": "mech-torque", "category": "vectors-mechanics", "topic": "Torque as force times lever arm", "requires": ["vector", "line", "point"] },
+    { "id": "mech-circular", "category": "vectors-mechanics", "topic": "Uniform circular motion and centripetal force", "requires": ["round", "vector:2"] },
+
+    { "id": "wave-standing", "category": "waves-optics", "topic": "Standing waves on a string: nodes and antinodes", "requires": ["curve", "point:2"] },
+    { "id": "wave-snell", "category": "waves-optics", "topic": "Snell's law: light bending at a boundary", "requires": ["line", "vector:2", "angle:2"] },
+    { "id": "wave-superposition", "category": "waves-optics", "topic": "Superposition of two waves: constructive and destructive", "requires": ["plot", "curve:3"] },
+    { "id": "wave-lens", "category": "waves-optics", "topic": "Ray diagram for a converging lens", "requires": ["round", "line:3", "vector"] },
+    { "id": "wave-doppler", "category": "waves-optics", "topic": "Doppler effect with circular wavefronts", "requires": ["round:3", "point"] },
+
+    { "id": "prob-venn-union", "category": "probability-sets", "topic": "Venn diagram for the union of two events", "requires": ["round:2", "region"] },
+    { "id": "prob-tree", "category": "probability-sets", "topic": "Probability tree for flipping two coins", "requires": ["line:6"] },
+    { "id": "prob-normal", "category": "probability-sets", "topic": "The normal distribution and the 68-95-99.7 rule", "requires": ["plot", "curve", "region"] },
+    { "id": "prob-geometric", "category": "probability-sets", "topic": "Chance a dart lands in a circle inside a square", "requires": ["round", "polygon", "region"] },
+    { "id": "prob-complement", "category": "probability-sets", "topic": "The complement of an event in a Venn diagram", "requires": ["round", "polygon", "region"] },
+
+    { "id": "alg-inequality", "category": "algebra-number-lines", "topic": "Solving a linear inequality on a number line", "requires": ["line", "point"] },
+    { "id": "alg-slope-intercept", "category": "algebra-number-lines", "topic": "Slope-intercept form of a straight line", "requires": ["plot", "curve", "point"] },
+    { "id": "alg-complete-square", "category": "algebra-number-lines", "topic": "Completing the square with an area model", "requires": ["polygon:3"] },
+    { "id": "alg-system", "category": "algebra-number-lines", "topic": "A system of two linear equations as crossing lines", "requires": ["plot", "curve:2", "point"] },
+    { "id": "alg-absolute", "category": "algebra-number-lines", "topic": "Absolute value as distance on a number line", "requires": ["line", "point:2"] },
+
+    { "id": "shape-hexagon", "category": "shapes-symmetry", "topic": "Lines of symmetry of a regular hexagon", "requires": ["polygon", "line:3"] },
+    { "id": "shape-tessellation", "category": "shapes-symmetry", "topic": "Tessellating the plane with equilateral triangles", "requires": ["polygon:6"] },
+    { "id": "shape-star", "category": "shapes-symmetry", "topic": "Rotational symmetry of a five-pointed star", "requires": ["polygon", "angle"] },
+    { "id": "shape-spiral", "category": "shapes-symmetry", "topic": "Golden spiral drawn inside nested squares", "requires": ["polygon:4", "curve"] },
+    { "id": "shape-butterfly", "category": "shapes-symmetry", "topic": "Drawing a butterfly with mirror symmetry", "requires": ["curve:2", "line"] }
+  ]
+}

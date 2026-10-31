@@ -6,6 +6,7 @@ import {
   BOARD_WIDTH,
   layoutHardFindingVector,
   layoutSteps,
+  overlapRatio,
   regionBox,
 } from "./layout";
 import { physicsDiagramLesson } from "./physicsTestFixture";
@@ -192,10 +193,3 @@ describe("normalized board layout", () => {
     });
   });
 });
-
-function overlapRatio(left: { x: number; y: number; width: number; height: number }, right: { x: number; y: number; width: number; height: number }): number {
-  const width = Math.max(0, Math.min(left.x + left.width, right.x + right.width) - Math.max(left.x, right.x));
-  const height = Math.max(0, Math.min(left.y + left.height, right.y + right.height) - Math.max(left.y, right.y));
-  const smallerArea = Math.min(left.width * left.height, right.width * right.height);
-  return smallerArea === 0 ? 0 : (width * height) / smallerArea;
-}

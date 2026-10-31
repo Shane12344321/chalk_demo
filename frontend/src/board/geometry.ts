@@ -1,7 +1,6 @@
-import rough from "roughjs/bin/rough";
-import type { PathInfo } from "roughjs/bin/core";
-import { axesPlotBox } from "./axesGeometry";
+import { axesFrame } from "./axesGeometry";
 import {
+  arcSamplePoints,
   arrowHeadPoints,
   cubicPath,
   diagramArcPoints,
@@ -11,11 +10,37 @@ import {
   sampleCubicSegments,
   smoothThroughPoints,
 } from "./diagramGeometry";
-import { sampleVisibleCurveSegments } from "./expression";
+import { frameTransform } from "./scene/frame";
+import { renderFrame } from "./scene/marks";
+import { sampleVisibleCurveSegments } from "./scene/sample";
 import { renderSafeLatex } from "./latex";
-import { equationFontSizeForContent } from "./equationSizing";
+import { EQUATION_BASE_FONT_PX } from "./equationSizing";
+import {
+  describeDiagramPrimitive,
+  formatAxisValue,
+  formatNumber,
+  manifestPartId,
+} from "./opDescriptions";
+import {
+  DIAGRAM_FILL,
+  ellipseCircumference,
+  inkGenerator,
+  normalizePaths,
+  padBox,
+  paddedPointBounds,
+  polylineLength,
+  roughLinePaths,
+  segmentLabel,
+  stableSeed,
+  styledLinePaths,
+  styledPolylinePaths,
+  type InkGenerator,
+} from "./roughInk";
+import { placeBoardLabels, type LabelMobility } from "./scene/labelSolver";
 import type { AxesOp, DiagramOp, DiagramPrimitive, LessonOp } from "./lesson.generated";
 import type { LaidOutOp, LayoutBox } from "./layout";
+import type { AlignedMorph, Subpath } from "./scene/morph";
+import type { Motion } from "./scene/motion";
 
 export interface BoardPath {
   d: string;
@@ -24,6 +49,16 @@ export interface BoardPath {
   fill: string;
   revealGroup?: number;
   revealWeight?: number;
+  /** Cubic Bezier subpaths of `d` (scene pipeline), shared by reveal and morph. */
+  subpaths?: Subpath[];
+  /** Closed outlines masked out of this path's fill (a shaded set minus others). */
+  holes?: string[];
+}
+
+/** A morph aligned once at preparation; the target's own paths take over at progress 1. */
+export interface BoardMorph extends AlignedMorph {
+  stroke: string;
+  strokeWidth: number;
 }
 
 export interface BoardLabel {
@@ -34,6 +69,8 @@ export interface BoardLabel {
   revealGroup?: number;
   fontSize?: number;
   autoPlace?: boolean;
+  /** How far the board-wide label solver may move this label; see scene/labelSolver.ts. */
+  mobility?: LabelMobility;
 }
 
 export interface BoardManifestPart {
@@ -59,6 +96,11 @@ export interface BoardGeometry {
   manifestSummary: string;
   stepIndex: number;
   opIndex: number;
+  /** How the element arrives over its op progress (scene pipeline); absent is a stroke reveal. */
+  motion?: Motion;
+  morph?: BoardMorph;
+  /** Element whose ink this one replaces once its motion starts. */
+  takesOver?: string;
 }
 
 export interface GeometryBuildResult {
@@ -109,83 +151,8 @@ export class BoardGeometryStore {
     for (const id of this.cache.keys()) {
       if (!liveIds.has(id)) this.cache.delete(id);
     }
-    return { geometries: declutterCanvasLabels(geometries), warnings };
+    return { geometries: placeBoardLabels(geometries), warnings };
   }
-}
-
-/**
- * Per-op geometry resolves label collisions only inside a single diagram op,
- * so standalone arrows, arcs, and points that converge on one vertex can
- * stack their labels into an unreadable pile. This pass re-runs the same
- * greedy placement across every op that shares a coordinate canvas. Cached
- * geometry keeps the raw positions; the pass is pure per build.
- */
-function declutterCanvasLabels(
-  geometries: readonly BoardGeometry[],
-): BoardGeometry[] {
-  const groups = new Map<string, number[]>();
-  geometries.forEach((geometry, index) => {
-    if (!geometry.canvasBox || geometry.labels.length === 0) return;
-    const { x, y, width, height } = geometry.canvasBox;
-    const key = `${x}:${y}:${width}:${height}`;
-    const members = groups.get(key);
-    if (members) members.push(index);
-    else groups.set(key, [index]);
-  });
-
-  const result = [...geometries];
-  for (const members of groups.values()) {
-    const movable = members.filter((index) => geometries[index].kind !== "diagram");
-    if (movable.length < 2 && (movable.length === 0 || members.length < 2)) continue;
-    const occupied: LayoutBox[] = [];
-    for (const index of members) {
-      const geometry = geometries[index];
-      if (geometry.kind === "diagram") {
-        occupied.push(...geometry.labels.map(labelBox));
-        occupied.push(...(geometry.inkBounds ?? []));
-      } else if (isThinBox(geometry.box)) {
-        occupied.push(geometry.box);
-      }
-    }
-    for (const index of movable) {
-      const geometry = geometries[index];
-      const canvas = geometry.canvasBox;
-      if (!canvas) continue;
-      const placed = geometry.labels.map((label) =>
-        placeLabelAvoiding(label, canvas, occupied),
-      );
-      occupied.push(...placed.map(labelBox));
-      if (placed.some((label, i) => label !== geometry.labels[i])) {
-        result[index] = { ...geometry, labels: placed };
-      }
-    }
-  }
-  return result;
-}
-
-function placeLabelAvoiding(
-  label: BoardLabel,
-  canvas: LayoutBox,
-  occupied: readonly LayoutBox[],
-): BoardLabel {
-  if (!label.autoPlace) return label;
-  const candidate = { ...label };
-  for (const [dx, dy] of labelPlacementOffsets()) {
-    candidate.x = label.x + dx;
-    candidate.y = label.y + dy;
-    clampLabelToCanvas(candidate, canvas);
-    if (!occupied.some((box) => boxesOverlap(labelBox(candidate), box))) {
-      return candidate.x === label.x && candidate.y === label.y
-        ? label
-        : candidate;
-    }
-  }
-  // Nothing fits: keep the authored position instead of exiling the label.
-  return label;
-}
-
-function isThinBox(box: LayoutBox): boolean {
-  return Math.min(box.width, box.height) <= 60;
 }
 
 function createGeometry(
@@ -212,20 +179,12 @@ function createGeometry(
     return {
       ...base,
       equationHtml: renderSafeLatex(op.latex),
-      equationFontSize: equationFontSizeForContent(op.latex, box.width),
+      equationFontSize: EQUATION_BASE_FONT_PX,
       manifestSummary: `equation: ${op.latex}`,
     };
   }
 
-  const generator = rough.generator({
-    options: {
-      roughness: 1.25,
-      bowing: 1.1,
-      stroke: "#2b2e36",
-      strokeWidth: 4,
-      disableMultiStroke: false,
-    },
-  });
+  const generator = inkGenerator();
 
   if (item.construction) {
     if (item.construction.kind === "point") {
@@ -241,7 +200,7 @@ function createGeometry(
           0,
           50,
         ),
-        labels: label ? [{ text: label, x: x + 16, y: y - 12 }] : [],
+        labels: label ? [{ text: label, x: x + 16, y: y - 12, autoPlace: true }] : [],
         manifestSummary: `${item.construction.summary}${label ? `; label ${label}` : ""}`,
       };
     }
@@ -260,10 +219,7 @@ function createGeometry(
 
   if (op.op === "sketch") {
     const paths = op.strokes.flatMap((stroke, index) => {
-      const points = stroke.map(([x, y]) => [
-        box.x + x * box.width,
-        box.y + y * box.height,
-      ] as [number, number]);
+      const points = stroke.map((point) => mapDiagramPoint(point, box));
       return normalizePaths(
         generator.toPaths(
           generator.linearPath(points, { seed: stableSeed(`${op.id}:${index}`) }),
@@ -295,11 +251,7 @@ function createGeometry(
     return {
       ...base,
       paths: rendered.flatMap(({ paths }) => paths),
-      labels: resolveDiagramLabelCollisions(
-        rendered.flatMap(({ labels }) => labels),
-        canvas,
-        inkBounds,
-      ),
+      labels: rendered.flatMap(({ labels }) => labels),
       inkBounds,
       manifestParts: op.primitives.map((primitive, index) => ({
         id: manifestPartId(op.id, index),
@@ -315,8 +267,8 @@ function createGeometry(
   if ((op.op === "line" || op.op === "arrow") && "from" in op) {
     const canvas = item.canvasBox;
     if (!canvas) throw new Error(`Diagram ${op.id} has no coordinate canvas.`);
-    const from = diagramPoint(op.from, canvas);
-    const to = diagramPoint(op.to, canvas);
+    const from = mapDiagramPoint(op.from, canvas);
+    const to = mapDiagramPoint(op.to, canvas);
     const paths = styledLinePaths(generator, from, to, op.stroke, op.id);
     const extentPoints: [number, number][] = [from, to];
     if (op.op === "arrow") {
@@ -350,7 +302,7 @@ function createGeometry(
   if (op.op === "point" && "at" in op) {
     const canvas = item.canvasBox;
     if (!canvas) throw new Error(`Diagram ${op.id} has no coordinate canvas.`);
-    const [x, y] = diagramPoint(op.at, canvas);
+    const [x, y] = mapDiagramPoint(op.at, canvas);
     return {
       ...base,
       box: paddedPointBounds([[x - 8, y - 8], [x + 8, y + 8]]),
@@ -371,18 +323,9 @@ function createGeometry(
   if (op.op === "angle_arc") {
     const canvas = item.canvasBox;
     if (!canvas) throw new Error(`Diagram ${op.id} has no coordinate canvas.`);
-    const center = diagramPoint(op.center, canvas);
+    const center = mapDiagramPoint(op.center, canvas);
     const radius = op.radius * Math.min(canvas.width, canvas.height);
-    const sweep = op.end_deg - op.start_deg;
-    const sampleCount = Math.max(8, Math.ceil(Math.abs(sweep) / 8));
-    const points = Array.from({ length: sampleCount + 1 }, (_, index) => {
-      const degrees = op.start_deg + (sweep * index) / sampleCount;
-      const radians = (degrees * Math.PI) / 180;
-      return [
-        center[0] + Math.cos(radians) * radius,
-        center[1] + Math.sin(radians) * radius,
-      ] as [number, number];
-    });
+    const points = arcSamplePoints(center, radius, radius, op.start_deg, op.end_deg);
     const midpointRadians = (((op.start_deg + op.end_deg) / 2) * Math.PI) / 180;
     return {
       ...base,
@@ -404,37 +347,14 @@ function createGeometry(
   }
 
   if (op.op === "axes") {
-    const left = box.x + 58;
-    const right = box.x + box.width - 24;
-    const top = box.y + 24;
-    const bottom = box.y + box.height - 52;
-    const paths = [
-      ...normalizePaths(
-        generator.toPaths(
-          generator.line(left, bottom, right, bottom, { seed: stableSeed(`${op.id}:x`) }),
-        ),
-        0,
-        right - left,
-      ),
-      ...normalizePaths(
-        generator.toPaths(
-          generator.line(left, bottom, left, top, { seed: stableSeed(`${op.id}:y`) }),
-        ),
-        1,
-        bottom - top,
-      ),
-    ];
+    // The same frame renderer the scene pipeline uses: axes on the plot edges,
+    // faint zero references, ticks, and titles.
+    const frame = renderFrame(frameTransform(axesFrame(op, box)), generator);
     return {
       ...base,
-      paths,
+      paths: frame.paths,
       manifestSummary: `axes: ${op.x.label} ${op.x.min} to ${op.x.max}; ${op.y.label} ${op.y.min} to ${op.y.max}`,
-      labels: [
-        { text: op.x.label, x: (left + right) / 2, y: bottom + 42, anchor: "middle" },
-        { text: op.y.label, x: left + 8, y: top + 4 },
-        { text: String(op.x.min), x: left, y: bottom + 30, anchor: "middle" },
-        { text: String(op.x.max), x: right, y: bottom + 30, anchor: "middle" },
-        { text: String(op.y.max), x: left - 14, y: top + 8, anchor: "end" },
-      ],
+      labels: frame.labels,
     };
   }
 
@@ -443,14 +363,9 @@ function createGeometry(
   }
   const target = axes.get(op.axes_id);
   if (!target) throw new Error(`Curve ${op.id} has no laid-out axes.`);
-  const plot = axesPlotBox(target.box);
+  const plot = frameTransform(axesFrame(target.op, target.box));
   const sampledSegments = sampleVisibleCurveSegments(op, target.op);
-  const visibleSegments = sampledSegments.map((segment) =>
-    segment.map(([x, y]) => [
-      plot.x + ((x - target.op.x.min) / (target.op.x.max - target.op.x.min)) * plot.width,
-      plot.y + plot.height - ((y - target.op.y.min) / (target.op.y.max - target.op.y.min)) * plot.height,
-    ] as [number, number]),
-  );
+  const visibleSegments = sampledSegments.map((segment) => segment.map(plot.toPixel));
   if (visibleSegments.length === 0) throw new Error(`Curve ${op.id} has fewer than two visible samples.`);
   const peak = sampledSegments
     .flat()
@@ -474,116 +389,8 @@ function createGeometry(
   };
 }
 
-function describeDiagramPrimitive(primitive: DiagramPrimitive): string {
-  if (primitive.meaning) return primitive.meaning;
-  const name = primitive.kind !== "text" && primitive.label ? `${primitive.label}: ` : "";
-  if (primitive.kind === "line" || primitive.kind === "smooth") {
-    const from = primitive.points[0];
-    const to = primitive.points.at(-1)!;
-    return `${name}${primitive.stroke}${primitive.arrow ? " arrow" : ` ${primitive.kind}`} from ${qualitativePoint(from)} to ${qualitativePoint(to)}`;
-  }
-  if (primitive.kind === "rect") {
-    return `${name}${primitive.fill ? "filled " : ""}rectangle from ${qualitativePoint(primitive.from)} to ${qualitativePoint(primitive.to)}`;
-  }
-  if (primitive.kind === "ellipse") {
-    return `${name}${primitive.fill ? "filled " : ""}ellipse at ${qualitativePoint(primitive.center)}`;
-  }
-  if (primitive.kind === "arc") {
-    return `${name}${primitive.stroke} arc at ${qualitativePoint(primitive.center)} from ${primitive.start_deg}° to ${primitive.end_deg}°${primitive.arrow ? " with arrow" : ""}`;
-  }
-  if (primitive.kind === "text") {
-    return `writing "${primitive.content}" at ${qualitativePoint(primitive.at)}`;
-  }
-  return `${name}point at ${qualitativePoint(primitive.at)}`;
-}
-
-function qualitativePoint([x, y]: readonly [number, number]): string {
-  const horizontal = x < 0.34 ? "left" : x > 0.66 ? "right" : "center";
-  const vertical = y < 0.34 ? "upper" : y > 0.66 ? "lower" : "middle";
-  return vertical === "middle" && horizontal === "center"
-    ? "center"
-    : vertical === "middle"
-      ? horizontal
-      : horizontal === "center"
-        ? `${vertical} center`
-        : `${vertical}-${horizontal}`;
-}
-
-function padBox(box: LayoutBox, padding: number): LayoutBox {
-  return {
-    x: box.x - padding,
-    y: box.y - padding,
-    width: box.width + padding * 2,
-    height: box.height + padding * 2,
-  };
-}
-
-function manifestPartId(parentId: string, index: number): string {
-  return `p${stableSeed(parentId).toString(36).slice(0, 7)}_${index}`;
-}
-
-function styledLinePaths(
-  generator: ReturnType<typeof rough.generator>,
-  from: [number, number],
-  to: [number, number],
-  stroke: "solid" | "dashed",
-  seedId: string,
-  revealGroup?: number,
-): BoardPath[] {
-  if (stroke === "solid") return roughLinePaths(generator, from, to, seedId, revealGroup ?? 0);
-  const distance = Math.hypot(to[0] - from[0], to[1] - from[1]);
-  const count = Math.max(2, Math.ceil(distance / 42));
-  return Array.from({ length: count }, (_, index) => {
-    const start = index / count;
-    const end = Math.min(1, start + 0.58 / count);
-    const dashFrom: [number, number] = [
-      from[0] + (to[0] - from[0]) * start,
-      from[1] + (to[1] - from[1]) * start,
-    ];
-    const dashTo: [number, number] = [
-      from[0] + (to[0] - from[0]) * end,
-      from[1] + (to[1] - from[1]) * end,
-    ];
-    return roughLinePaths(
-      generator,
-      dashFrom,
-      dashTo,
-      `${seedId}:dash-${index}`,
-      revealGroup ?? index,
-    );
-  }).flat();
-}
-
-function styledPolylinePaths(
-  generator: ReturnType<typeof rough.generator>,
-  points: readonly [number, number][],
-  stroke: "solid" | "dashed",
-  seedId: string,
-  revealGroup?: number,
-): BoardPath[] {
-  if (stroke === "solid") {
-    return normalizePaths(
-      generator.toPaths(
-        generator.linearPath([...points], { seed: stableSeed(`${seedId}:arc`) }),
-      ),
-      revealGroup ?? 0,
-      polylineLength(points),
-    );
-  }
-  return points.slice(1).flatMap((to, index) =>
-    styledLinePaths(
-      generator,
-      points[index],
-      to,
-      "dashed",
-      `${seedId}:arc-${index}`,
-      revealGroup,
-    ),
-  );
-}
-
 function renderDiagramPrimitive(
-  generator: ReturnType<typeof rough.generator>,
+  generator: InkGenerator,
   primitive: DiagramPrimitive,
   canvas: LayoutBox,
   op: DiagramOp,
@@ -646,7 +453,7 @@ function renderDiagramPrimitive(
         generator.toPaths(
           generator.rectangle(x, y, width, height, {
             seed: stableSeed(seedId),
-            ...(primitive.fill ? { fill: diagramFill(), fillStyle: "solid" } : {}),
+            ...(primitive.fill ? { fill: DIAGRAM_FILL, fillStyle: "solid" } : {}),
           }),
         ),
         group,
@@ -666,7 +473,7 @@ function renderDiagramPrimitive(
         generator.toPaths(
           generator.ellipse(center[0], center[1], width, height, {
             seed: stableSeed(seedId),
-            ...(primitive.fill ? { fill: diagramFill(), fillStyle: "solid" } : {}),
+            ...(primitive.fill ? { fill: DIAGRAM_FILL, fillStyle: "solid" } : {}),
           }),
         ),
         group,
@@ -698,7 +505,7 @@ function renderDiagramPrimitive(
     const [x, y] = mapDiagramPoint(primitive.at, canvas);
     const anchor = primitive.align === "center" ? "middle" : primitive.align === "right" ? "end" : "start";
     const fontSize = diagramTextFontSize(primitive);
-    labels = [{ text: primitive.content, x, y, anchor, fontSize }];
+    labels = [{ text: primitive.content, x, y, anchor, fontSize, mobility: "nudge" }];
     paths = [{
       d: `M ${x} ${y} l 0.01 0`,
       stroke: "transparent",
@@ -723,185 +530,4 @@ function renderDiagramPrimitive(
   };
 }
 
-function diagramFill(): string {
-  return "rgba(217, 122, 41, 0.12)";
-}
-
-function ellipseCircumference(radiusX: number, radiusY: number): number {
-  return Math.PI * (3 * (radiusX + radiusY) - Math.sqrt((3 * radiusX + radiusY) * (radiusX + 3 * radiusY)));
-}
-
-function roughLinePaths(
-  generator: ReturnType<typeof rough.generator>,
-  from: [number, number],
-  to: [number, number],
-  seedId: string,
-  revealGroup: number,
-): BoardPath[] {
-  return normalizePaths(
-    generator.toPaths(
-      generator.line(from[0], from[1], to[0], to[1], {
-        seed: stableSeed(seedId),
-      }),
-    ),
-    revealGroup,
-    Math.max(1, Math.hypot(to[0] - from[0], to[1] - from[1])),
-  );
-}
-
-function segmentLabel(
-  text: string,
-  from: [number, number],
-  to: [number, number],
-): BoardLabel {
-  const length = Math.max(1, Math.hypot(to[0] - from[0], to[1] - from[1]));
-  return {
-    text,
-    x: (from[0] + to[0]) / 2 - ((to[1] - from[1]) / length) * 20,
-    y: (from[1] + to[1]) / 2 + ((to[0] - from[0]) / length) * 20,
-    anchor: "middle",
-    autoPlace: true,
-  };
-}
-
-function resolveDiagramLabelCollisions(
-  labels: readonly BoardLabel[],
-  canvas: LayoutBox,
-  inkBounds: readonly LayoutBox[],
-): BoardLabel[] {
-  const resolved = labels.map((label) => ({ ...label }));
-  const occupied = resolved
-    .filter((label) => !label.autoPlace)
-    .map(labelBox);
-  const offsets = labelPlacementOffsets();
-  for (const label of resolved) {
-    if (!label.autoPlace) continue;
-    const original = { x: label.x, y: label.y };
-    let chosen = labelBox(label);
-    let chosenPosition = { ...original };
-    for (const [dx, dy] of offsets) {
-      label.x = original.x + dx;
-      label.y = original.y + dy;
-      clampLabelToCanvas(label, canvas);
-      const candidate = labelBox(label);
-      chosen = candidate;
-      chosenPosition = { x: label.x, y: label.y };
-      if (
-        !occupied.some((box) => boxesOverlap(candidate, box)) &&
-        !inkBounds.some((box) => boxesOverlap(candidate, box))
-      ) {
-        break;
-      }
-    }
-    label.x = chosenPosition.x;
-    label.y = chosenPosition.y;
-    occupied.push(chosen);
-  }
-  return resolved;
-}
-
-function labelPlacementOffsets(): readonly [number, number][] {
-  const result: [number, number][] = [[0, 0]];
-  for (const distance of [34, 68, 102]) {
-    result.push(
-      [0, -distance], [0, distance],
-      [distance, 0], [-distance, 0],
-      [distance, -distance], [-distance, -distance],
-      [distance, distance], [-distance, distance],
-    );
-  }
-  return result;
-}
-
-function labelBox(label: BoardLabel): LayoutBox {
-  const fontSize = label.fontSize ?? 31;
-  const width = Math.max(fontSize * 0.65, label.text.length * fontSize * 0.58);
-  const x = label.anchor === "end"
-    ? label.x - width
-    : label.anchor === "middle"
-      ? label.x - width / 2
-      : label.x;
-  return { x, y: label.y - fontSize, width, height: fontSize * 1.25 };
-}
-
-function clampLabelToCanvas(label: BoardLabel, canvas: LayoutBox): void {
-  const box = labelBox(label);
-  const dx = box.x < canvas.x
-    ? canvas.x - box.x
-    : box.x + box.width > canvas.x + canvas.width
-      ? canvas.x + canvas.width - box.x - box.width
-      : 0;
-  const dy = box.y < canvas.y
-    ? canvas.y - box.y
-    : box.y + box.height > canvas.y + canvas.height
-      ? canvas.y + canvas.height - box.y - box.height
-      : 0;
-  label.x += dx;
-  label.y += dy;
-}
-
-function boxesOverlap(left: LayoutBox, right: LayoutBox): boolean {
-  const padding = 8;
-  return left.x < right.x + right.width + padding &&
-    left.x + left.width + padding > right.x &&
-    left.y < right.y + right.height + padding &&
-    left.y + left.height + padding > right.y;
-}
-
-function diagramPoint(
-  point: readonly [number, number],
-  canvas: LayoutBox,
-): [number, number] {
-  return [canvas.x + point[0] * canvas.width, canvas.y + point[1] * canvas.height];
-}
-
-function formatNumber(value: number): string {
-  return Number(value.toFixed(2)).toString();
-}
-
-function normalizePaths(
-  paths: PathInfo[],
-  revealGroup?: number,
-  revealWeight?: number,
-): BoardPath[] {
-  return paths.map((path) => ({
-    d: path.d,
-    stroke: path.stroke || "#2b2e36",
-    strokeWidth: path.strokeWidth || 4,
-    fill: path.fill && path.fill !== "none" ? path.fill : "none",
-    ...(revealGroup === undefined ? {} : { revealGroup }),
-    ...(revealWeight === undefined ? {} : { revealWeight }),
-  }));
-}
-
-function polylineLength(points: readonly [number, number][]): number {
-  let length = 0;
-  for (let index = 1; index < points.length; index += 1) {
-    const [previousX, previousY] = points[index - 1];
-    const [x, y] = points[index];
-    length += Math.hypot(x - previousX, y - previousY);
-  }
-  return Math.max(1, length);
-}
-
-function paddedPointBounds(points: readonly [number, number][], padding = 18): LayoutBox {
-  const left = Math.min(...points.map(([x]) => x));
-  const top = Math.min(...points.map(([, y]) => y));
-  const right = Math.max(...points.map(([x]) => x));
-  const bottom = Math.max(...points.map(([, y]) => y));
-  return {
-    x: left - padding,
-    y: top - padding,
-    width: right - left + padding * 2,
-    height: bottom - top + padding * 2,
-  };
-}
-
-export function stableSeed(id: string): number {
-  let hash = 2_166_136_261;
-  for (let index = 0; index < id.length; index += 1) {
-    hash ^= id.charCodeAt(index);
-    hash = Math.imul(hash, 16_777_619);
-  }
-  return (hash >>> 0) || 1;
-}
+export { formatAxisValue, stableSeed };

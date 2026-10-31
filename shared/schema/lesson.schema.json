@@ -7,7 +7,7 @@
   "additionalProperties": false,
   "required": ["schema_version", "title", "steps"],
   "properties": {
-    "schema_version": { "enum": ["1.0", "1.1", "1.2", "1.3", "1.4"] },
+    "schema_version": { "enum": ["1.0", "1.1", "1.2", "1.3", "1.4", "1.5"] },
     "title": { "type": "string", "minLength": 1, "maxLength": 80 },
     "steps": {
       "type": "array",
@@ -668,6 +668,353 @@
         "stroke": { "$ref": "#/$defs/strokeStyle" }, "label": { "type": "string", "minLength": 1, "maxLength": 32 }
       }
     },
+    "figureNumber": { "type": "number", "minimum": -1000000, "maximum": 1000000 },
+    "figureRange": {
+      "title": "FigureRange",
+      "type": "array",
+      "items": [{ "$ref": "#/$defs/figureNumber" }, { "$ref": "#/$defs/figureNumber" }],
+      "additionalItems": false,
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "figureFrame": {
+      "title": "FigureFrame",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y"],
+      "properties": {
+        "x": { "$ref": "#/$defs/figureRange" },
+        "y": { "$ref": "#/$defs/figureRange" },
+        "axes": { "type": "string", "enum": ["edge", "origin", "none"] },
+        "grid": { "type": "boolean" },
+        "equal_scale": { "type": "boolean" },
+        "x_label": { "type": "string", "minLength": 1, "maxLength": 24 },
+        "y_label": { "type": "string", "minLength": 1, "maxLength": 24 }
+      }
+    },
+    "figurePoint": {
+      "title": "FigurePoint",
+      "oneOf": [
+        { "$ref": "#/$defs/figureRange" },
+        { "type": "object", "additionalProperties": false, "required": ["at"], "properties": { "at": { "$ref": "#/$defs/elementId" } } },
+        { "type": "object", "additionalProperties": false, "required": ["mid"], "properties": { "mid": { "type": "array", "items": { "$ref": "#/$defs/elementId" }, "minItems": 2, "maxItems": 2 } } },
+        { "type": "object", "additionalProperties": false, "required": ["on", "x"], "properties": { "on": { "$ref": "#/$defs/elementId" }, "x": { "$ref": "#/$defs/figureNumber" } } },
+        { "type": "object", "additionalProperties": false, "required": ["on", "t"], "properties": { "on": { "$ref": "#/$defs/elementId" }, "t": { "type": "number", "minimum": 0, "maximum": 1 } } },
+        { "type": "object", "additionalProperties": false, "required": ["hit"], "properties": { "hit": { "type": "array", "items": { "$ref": "#/$defs/elementId" }, "minItems": 2, "maxItems": 2 } } },
+        { "type": "object", "additionalProperties": false, "required": ["foot", "onto"], "properties": { "foot": { "$ref": "#/$defs/elementId" }, "onto": { "$ref": "#/$defs/elementId" } } }
+      ]
+    },
+    "figurePointMark": {
+      "title": "FigurePointMark",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "at"],
+      "properties": {
+        "kind": { "const": "point" },
+        "id": { "$ref": "#/$defs/elementId" },
+        "at": { "$ref": "#/$defs/figurePoint" },
+        "label": { "type": "string", "minLength": 1, "maxLength": 24 }
+      }
+    },
+    "figureSegmentMark": {
+      "title": "FigureSegmentMark",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "from", "to"],
+      "properties": {
+        "kind": { "const": "segment" },
+        "id": { "$ref": "#/$defs/elementId" },
+        "from": { "$ref": "#/$defs/figurePoint" },
+        "to": { "$ref": "#/$defs/figurePoint" },
+        "arrow": { "type": "boolean" },
+        "stroke": { "$ref": "#/$defs/strokeStyle" },
+        "label": { "type": "string", "minLength": 1, "maxLength": 24 }
+      }
+    },
+    "figurePolylineMark": {
+      "title": "FigurePolylineMark",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "points"],
+      "properties": {
+        "kind": { "const": "polyline" },
+        "id": { "$ref": "#/$defs/elementId" },
+        "points": { "type": "array", "minItems": 2, "maxItems": 24, "items": { "$ref": "#/$defs/figurePoint" } },
+        "closed": { "type": "boolean" },
+        "smooth": { "type": "boolean" },
+        "arrow": { "type": "boolean" },
+        "fill": { "type": "boolean" },
+        "stroke": { "$ref": "#/$defs/strokeStyle" },
+        "label": { "type": "string", "minLength": 1, "maxLength": 24 }
+      }
+    },
+    "figureCircleMark": {
+      "title": "FigureCircleMark",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "center", "r"],
+      "properties": {
+        "kind": { "const": "circle" },
+        "id": { "$ref": "#/$defs/elementId" },
+        "center": { "$ref": "#/$defs/figurePoint" },
+        "r": { "type": "number", "exclusiveMinimum": 0, "maximum": 1000000 },
+        "fill": { "type": "boolean" },
+        "stroke": { "$ref": "#/$defs/strokeStyle" },
+        "label": { "type": "string", "minLength": 1, "maxLength": 24 }
+      }
+    },
+    "figureArcMark": {
+      "title": "FigureArcMark",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "center", "r", "start", "end"],
+      "properties": {
+        "kind": { "const": "arc" },
+        "id": { "$ref": "#/$defs/elementId" },
+        "center": { "$ref": "#/$defs/figurePoint" },
+        "r": { "type": "number", "exclusiveMinimum": 0, "maximum": 1000000 },
+        "start": { "type": "number", "minimum": -720, "maximum": 720 },
+        "end": { "type": "number", "minimum": -720, "maximum": 720 },
+        "arrow": { "type": "boolean" },
+        "stroke": { "$ref": "#/$defs/strokeStyle" },
+        "label": { "type": "string", "minLength": 1, "maxLength": 24 }
+      }
+    },
+    "figureFnMark": {
+      "title": "FigureFnMark",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "y"],
+      "properties": {
+        "kind": { "const": "fn" },
+        "id": { "$ref": "#/$defs/elementId" },
+        "y": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "domain": { "$ref": "#/$defs/figureRange" },
+        "stroke": { "$ref": "#/$defs/strokeStyle" },
+        "label": { "type": "string", "minLength": 1, "maxLength": 24 }
+      }
+    },
+    "figureParamMark": {
+      "title": "FigureParamMark",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "x", "y", "t"],
+      "properties": {
+        "kind": { "const": "param" },
+        "id": { "$ref": "#/$defs/elementId" },
+        "x": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "y": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "t": { "$ref": "#/$defs/figureRange" },
+        "stroke": { "$ref": "#/$defs/strokeStyle" },
+        "label": { "type": "string", "minLength": 1, "maxLength": 24 }
+      }
+    },
+    "figurePolarMark": {
+      "title": "FigurePolarMark",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "r", "theta"],
+      "properties": {
+        "kind": { "const": "polar" },
+        "id": { "$ref": "#/$defs/elementId" },
+        "r": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "theta": { "$ref": "#/$defs/figureRange" },
+        "stroke": { "$ref": "#/$defs/strokeStyle" },
+        "label": { "type": "string", "minLength": 1, "maxLength": 24 }
+      }
+    },
+    "figureShadeUnderMark": {
+      "title": "FigureShadeUnderMark",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "under"],
+      "properties": {
+        "kind": { "const": "shade" },
+        "id": { "$ref": "#/$defs/elementId" },
+        "under": { "$ref": "#/$defs/elementId" },
+        "from": { "$ref": "#/$defs/figureNumber" },
+        "to": { "$ref": "#/$defs/figureNumber" },
+        "label": { "type": "string", "minLength": 1, "maxLength": 24 }
+      }
+    },
+    "figureShadeBetweenMark": {
+      "title": "FigureShadeBetweenMark",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "between"],
+      "properties": {
+        "kind": { "const": "shade" },
+        "id": { "$ref": "#/$defs/elementId" },
+        "between": { "type": "array", "items": { "$ref": "#/$defs/elementId" }, "minItems": 2, "maxItems": 2 },
+        "from": { "$ref": "#/$defs/figureNumber" },
+        "to": { "$ref": "#/$defs/figureNumber" },
+        "label": { "type": "string", "minLength": 1, "maxLength": 24 }
+      }
+    },
+    "figureShadeInsideMark": {
+      "title": "FigureShadeInsideMark",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "inside"],
+      "properties": {
+        "kind": { "const": "shade" },
+        "id": { "$ref": "#/$defs/elementId" },
+        "inside": { "$ref": "#/$defs/elementId" },
+        "except": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/elementId" },
+          "minItems": 1,
+          "maxItems": 4,
+          "uniqueItems": true
+        },
+        "label": { "type": "string", "minLength": 1, "maxLength": 24 }
+      }
+    },
+    "figureAngleMark": {
+      "title": "FigureAngleMark",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "at", "from", "to"],
+      "properties": {
+        "kind": { "const": "angle" },
+        "id": { "$ref": "#/$defs/elementId" },
+        "at": { "$ref": "#/$defs/figurePoint" },
+        "from": { "$ref": "#/$defs/figurePoint" },
+        "to": { "$ref": "#/$defs/figurePoint" },
+        "r": { "type": "number", "minimum": 0.03, "maximum": 0.3 },
+        "label": { "type": "string", "minLength": 1, "maxLength": 24 }
+      }
+    },
+    "figureTangentMark": {
+      "title": "FigureTangentMark",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "to", "x"],
+      "properties": {
+        "kind": { "const": "tangent" },
+        "id": { "$ref": "#/$defs/elementId" },
+        "to": { "$ref": "#/$defs/elementId" },
+        "x": { "$ref": "#/$defs/figureNumber" },
+        "length": { "type": "number", "minimum": 0.05, "maximum": 1 },
+        "stroke": { "$ref": "#/$defs/strokeStyle" },
+        "label": { "type": "string", "minLength": 1, "maxLength": 24 }
+      }
+    },
+    "figurePerpendicularMark": {
+      "title": "FigurePerpendicularMark",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "to", "through"],
+      "properties": {
+        "kind": { "const": "perpendicular" },
+        "id": { "$ref": "#/$defs/elementId" },
+        "to": { "$ref": "#/$defs/elementId" },
+        "through": { "$ref": "#/$defs/figurePoint" },
+        "length": { "type": "number", "minimum": 0.05, "maximum": 1 },
+        "stroke": { "$ref": "#/$defs/strokeStyle" },
+        "label": { "type": "string", "minLength": 1, "maxLength": 24 }
+      }
+    },
+    "figureMeasureMark": {
+      "title": "FigureMeasureMark",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "from", "to", "label"],
+      "properties": {
+        "kind": { "const": "measure" },
+        "id": { "$ref": "#/$defs/elementId" },
+        "from": { "$ref": "#/$defs/figurePoint" },
+        "to": { "$ref": "#/$defs/figurePoint" },
+        "label": { "type": "string", "minLength": 1, "maxLength": 24 }
+      }
+    },
+    "figureTextMark": {
+      "title": "FigureTextMark",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "at", "text"],
+      "properties": {
+        "kind": { "const": "text" },
+        "id": { "$ref": "#/$defs/elementId" },
+        "at": { "$ref": "#/$defs/figurePoint" },
+        "text": { "type": "string", "minLength": 1, "maxLength": 40 },
+        "align": { "type": "string", "enum": ["left", "center", "right"] },
+        "size": { "type": "string", "enum": ["small", "normal", "large"] }
+      }
+    },
+    "figureLeafMark": {
+      "title": "FigureLeafMark",
+      "oneOf": [
+        { "$ref": "#/$defs/figurePointMark" },
+        { "$ref": "#/$defs/figureSegmentMark" },
+        { "$ref": "#/$defs/figurePolylineMark" },
+        { "$ref": "#/$defs/figureCircleMark" },
+        { "$ref": "#/$defs/figureArcMark" },
+        { "$ref": "#/$defs/figureFnMark" },
+        { "$ref": "#/$defs/figureParamMark" },
+        { "$ref": "#/$defs/figurePolarMark" },
+        { "$ref": "#/$defs/figureShadeUnderMark" },
+        { "$ref": "#/$defs/figureShadeBetweenMark" },
+        { "$ref": "#/$defs/figureShadeInsideMark" },
+        { "$ref": "#/$defs/figureAngleMark" },
+        { "$ref": "#/$defs/figureTangentMark" },
+        { "$ref": "#/$defs/figurePerpendicularMark" },
+        { "$ref": "#/$defs/figureMeasureMark" },
+        { "$ref": "#/$defs/figureTextMark" }
+      ]
+    },
+    "figureGroupMark": {
+      "title": "FigureGroupMark",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "marks"],
+      "properties": {
+        "kind": { "const": "group" },
+        "id": { "$ref": "#/$defs/elementId" },
+        "marks": { "type": "array", "minItems": 1, "maxItems": 8, "items": { "$ref": "#/$defs/figureLeafMark" } },
+        "mirror": { "type": "string", "enum": ["x", "y"] },
+        "rotate": { "type": "number", "minimum": -360, "maximum": 360 },
+        "scale": { "type": "number", "minimum": 0.1, "maximum": 10 },
+        "translate": { "$ref": "#/$defs/figureRange" },
+        "origin": { "$ref": "#/$defs/figureRange" },
+        "repeat": { "type": "integer", "minimum": 2, "maximum": 12 }
+      }
+    },
+    "figureMark": {
+      "title": "FigureMark",
+      "oneOf": [{ "$ref": "#/$defs/figureLeafMark" }, { "$ref": "#/$defs/figureGroupMark" }]
+    },
+    "figureRegionOp": {
+      "title": "FigureRegionOp",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op", "id", "region", "frame", "marks"],
+      "properties": {
+        "op": { "const": "figure" },
+        "id": { "$ref": "#/$defs/elementId" },
+        "region": { "$ref": "#/$defs/region" },
+        "frame": { "$ref": "#/$defs/figureFrame" },
+        "marks": { "type": "array", "minItems": 1, "maxItems": 16, "items": { "$ref": "#/$defs/figureMark" } },
+        "meaning": { "type": "string", "minLength": 3, "maxLength": 120 }
+      }
+    },
+    "figureOnOp": {
+      "title": "FigureOnOp",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op", "id", "on", "marks"],
+      "properties": {
+        "op": { "const": "figure" },
+        "id": { "$ref": "#/$defs/elementId" },
+        "on": { "$ref": "#/$defs/elementId" },
+        "marks": { "type": "array", "minItems": 1, "maxItems": 16, "items": { "$ref": "#/$defs/figureMark" } },
+        "meaning": { "type": "string", "minLength": 3, "maxLength": 120 }
+      }
+    },
+    "figureOp": {
+      "title": "FigureOp",
+      "oneOf": [{ "$ref": "#/$defs/figureRegionOp" }, { "$ref": "#/$defs/figureOnOp" }]
+    },
     "op": {
       "title": "LessonOp",
       "oneOf": [
@@ -680,7 +1027,8 @@
         { "$ref": "#/$defs/lineOp" },
         { "$ref": "#/$defs/arrowOp" },
         { "$ref": "#/$defs/pointOp" },
-        { "$ref": "#/$defs/angleArcOp" }
+        { "$ref": "#/$defs/angleArcOp" },
+        { "$ref": "#/$defs/figureOp" }
       ]
     },
     "checkpoint": {

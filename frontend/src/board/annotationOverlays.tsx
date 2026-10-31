@@ -5,6 +5,7 @@ import { renderSafeLatex } from "./latex";
 import { BOARD_HEIGHT, BOARD_WIDTH, type LayoutBox } from "./layout";
 import type { VisibleBoardElement } from "./manifest";
 import { fitBoardText } from "./textLayout";
+import { FittedEquation } from "./FittedEquation";
 
 export function AnnotationOverlayLayer({
   ops,
@@ -131,9 +132,10 @@ function AnnotationMark({
   if (!equationHtml) return null;
   return (
     <foreignObject x={box.x} y={box.y} width={box.width} height={box.height} {...data}>
-      <div
+      <FittedEquation
+        key={`${equationHtml}|${box.width}x${box.height}`}
         className="board-equation board-annotation-equation"
-        dangerouslySetInnerHTML={{ __html: equationHtml }}
+        html={equationHtml}
       />
     </foreignObject>
   );

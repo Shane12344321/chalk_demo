@@ -21,14 +21,15 @@ from app.m3_evaluation import (
 REQUEST_ID_PATTERN = "783c6081-75a4-4ed2-8be7-4e0f32680a2b"
 
 
-def test_runtime_default_matches_the_qualification_model(monkeypatch) -> None:
+def test_runtime_default_is_owner_selected_while_m3_stays_pinned(monkeypatch) -> None:
+    # The runtime default moved to GPT-6.1 Sol on 2026-10-18. The M3 harness keeps
+    # its historical Luna/none qualification so old and new evidence never mix.
     monkeypatch.delenv("BOARD_MODEL", raising=False)
     monkeypatch.delenv("BOARD_REASONING_EFFORT", raising=False)
-    assert Settings(_env_file=None).board_model == evaluation_module.M3_QUALIFICATION_BOARD_MODEL
-    assert (
-        Settings(_env_file=None).board_reasoning_effort
-        == evaluation_module.M3_QUALIFICATION_REASONING_EFFORT
-    )
+    assert Settings(_env_file=None).board_model == "gpt-6.1-sol"
+    assert Settings(_env_file=None).board_reasoning_effort == "low"
+    assert evaluation_module.M3_QUALIFICATION_BOARD_MODEL == "gpt-5.6-luna"
+    assert evaluation_module.M3_QUALIFICATION_REASONING_EFFORT == "none"
 
 
 def test_evaluation_retains_validated_raw_ndjson_and_redacted_metrics(tmp_path: Path) -> None:
@@ -514,7 +515,12 @@ def test_repair_smoke_is_structurally_one_call_and_retains_no_content(
 
     monkeypatch.setattr(evaluation_module, "_run_repair_probe", repaired)
     monkeypatch.setattr(evaluation_module, "_prompt_sha256", lambda _name: "a" * 64)
-    test_settings = evaluation_module.Settings(openai_api_key="test-api-key")
+    test_settings = evaluation_module.Settings(
+        _env_file=None,
+        openai_api_key="test-api-key",
+        board_model=evaluation_module.M3_QUALIFICATION_BOARD_MODEL,
+        board_reasoning_effort=evaluation_module.M3_QUALIFICATION_REASONING_EFFORT,
+    )
     monkeypatch.setattr(evaluation_module, "Settings", lambda: test_settings)
     output_dir = tmp_path / "repair-smoke"
     summary, passed = evaluation_module.run_repair_smoke(output_dir)

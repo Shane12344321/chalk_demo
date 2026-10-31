@@ -81,21 +81,19 @@ describe("offline drawing rescore", () => {
           op: "diagram",
           id: "figure",
           region: "full",
-          primitives: [
-            { kind: "text", at: [0.5, 0.5], content: "first", align: "center" },
-            { kind: "text", at: [0.5, 0.5], content: "second", align: "center" },
-          ],
+          // More long labels at one spot than any nearby placement can separate.
+          primitives: Array.from({ length: 16 }, (_, index) => ({
+            kind: "text", at: [0.5, 0.5], content: `crowded label number ${index}`, align: "center",
+          })),
         }],
         checkpoint: null,
       }],
     };
     const result = rescoreRetainedFixtures([{ topicId: "positive-lint", source: collision }]);
 
-    expect(result.topics[0].findings).toContainEqual({
-      code: "label_overlap",
-      evidence: "estimated",
-      count: 1,
-    });
+    expect(result.topics[0].findings).toContainEqual(
+      expect.objectContaining({ code: "label_overlap", evidence: "estimated" }),
+    );
   });
 
   it("fails closed on invalid or duplicate retained input", () => {

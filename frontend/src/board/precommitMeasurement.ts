@@ -1,5 +1,5 @@
 import { renderSafeLatex } from "./latex";
-import { equationFontSizeForContent } from "./equationSizing";
+import { EQUATION_BASE_FONT_PX } from "./equationSizing";
 
 export type MeasurableRootKind = "text" | "equation";
 export type MeasurementEvidence = "measured" | "estimated";
@@ -209,7 +209,7 @@ export function createBrowserMeasurementRuntime(
         top: "-10000px",
         display: "inline-block",
         width: "max-content",
-        maxWidth: `${maxWidth}px`,
+        maxWidth: "none",
         height: "auto",
       });
       // KaTeX generated this markup with trust disabled and the CHALK command
@@ -217,22 +217,14 @@ export function createBrowserMeasurementRuntime(
       host.innerHTML = renderSafeLatex(content);
       documentValue.body.append(host);
       try {
-        let sizingWidth = maxWidth;
-        let result: { width: number; height: number } | undefined;
-        // Resolve the small circular dependency between fitted font size and
-        // measured box. The painter applies the same function to the final box;
-        // three bounded iterations converge for the 10–31 px closed range.
-        for (let iteration = 0; iteration < 3; iteration += 1) {
-          host.style.fontSize = `${equationFontSizeForContent(content, sizingWidth)}px`;
-          const box = host.getBoundingClientRect();
-          if (!validSize(box)) return undefined;
-          result = {
-            width: Math.min(maxWidth, box.width + 12),
-            height: box.height + 12,
-          };
-          sizingWidth = result.width;
-        }
-        return result;
+        // Measure natural ink at the base size. The painter shrinks an equation
+        // that is wider than its box, so the reserved height shrinks with it.
+        host.style.fontSize = `${EQUATION_BASE_FONT_PX}px`;
+        const box = host.getBoundingClientRect();
+        if (!validSize(box)) return undefined;
+        const naturalWidth = box.width + 12;
+        const scale = Math.min(1, maxWidth / naturalWidth);
+        return { width: Math.min(maxWidth, naturalWidth), height: box.height * scale + 12 };
       } finally {
         host.remove();
       }

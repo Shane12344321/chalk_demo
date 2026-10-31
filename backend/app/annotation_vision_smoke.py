@@ -91,7 +91,8 @@ def run_annotation_vision_smoke(
                     "instructions": (PROMPT_DIR / "annotation.md").read_text(encoding="utf-8"),
                     "input": [{"role": "user", "content": content}],
                     "reasoning": {"effort": settings.board_reasoning_effort},
-                    "max_output_tokens": MAX_ANNOTATION_OUTPUT_TOKENS,
+                    "max_output_tokens": MAX_ANNOTATION_OUTPUT_TOKENS
+                    + settings.board_output_token_headroom,
                     "store": False,
                 },
                 timeout=httpx.Timeout(settings.annotation_generation_timeout_seconds),

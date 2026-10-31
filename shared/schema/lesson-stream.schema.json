@@ -110,14 +110,16 @@
         "corrections": {
           "type": "array",
           "minItems": 1,
-          "maxItems": 4,
+          "maxItems": 6,
           "uniqueItems": true,
           "items": {
             "enum": [
               "trimmed_outer_whitespace",
               "normalized_power_operator",
               "clamped_anchor_gap",
-              "clamped_normalized_point"
+              "clamped_normalized_point",
+              "dropped_extra_checkpoint",
+              "dropped_invalid_checkpoint"
             ]
           }
         },

@@ -79,13 +79,30 @@ export function diagramArcPoints(
   primitive: Extract<DiagramPrimitive, { kind: "arc" }>,
   canvas: LayoutBox,
 ): DiagramPoint[] {
-  const center = mapDiagramPoint(primitive.center, canvas);
-  const radiusX = primitive.radius[0] * canvas.width;
-  const radiusY = primitive.radius[1] * canvas.height;
-  const sweep = primitive.end_deg - primitive.start_deg;
+  return arcSamplePoints(
+    mapDiagramPoint(primitive.center, canvas),
+    primitive.radius[0] * canvas.width,
+    primitive.radius[1] * canvas.height,
+    primitive.start_deg,
+    primitive.end_deg,
+  );
+}
+
+/**
+ * Samples of an elliptical arc in board pixels. Angles are screen degrees
+ * (clockwise, y down), one sample per 8° and at least eight segments.
+ */
+export function arcSamplePoints(
+  center: readonly [number, number],
+  radiusX: number,
+  radiusY: number,
+  startDeg: number,
+  endDeg: number,
+): DiagramPoint[] {
+  const sweep = endDeg - startDeg;
   const samples = Math.max(8, Math.ceil(Math.abs(sweep) / 8));
   return Array.from({ length: samples + 1 }, (_, index) => {
-    const angle = ((primitive.start_deg + (sweep * index) / samples) * Math.PI) / 180;
+    const angle = ((startDeg + (sweep * index) / samples) * Math.PI) / 180;
     return [
       center[0] + Math.cos(angle) * radiusX,
       center[1] + Math.sin(angle) * radiusY,
@@ -135,6 +152,9 @@ export function diagramPrimitiveBounds(
   return boundsOfPoints(points);
 }
 
+/** Advance of the monospace label font (`.board-axis-label`: SF Mono, Menlo) per pixel of size. */
+export const LABEL_CHARACTER_EM = 0.6;
+
 export function diagramTextFontSize(
   primitive: Extract<DiagramPrimitive, { kind: "text" }>,
 ): number {
@@ -147,7 +167,7 @@ export function diagramTextBounds(
 ): LayoutBox {
   const [x, baseline] = mapDiagramPoint(primitive.at, canvas);
   const fontSize = diagramTextFontSize(primitive);
-  const width = Math.max(fontSize * 0.65, primitive.content.length * fontSize * 0.58);
+  const width = Math.max(fontSize * 0.65, primitive.content.length * fontSize * LABEL_CHARACTER_EM);
   const left = primitive.align === "right"
     ? x - width
     : primitive.align === "center"
@@ -190,7 +210,7 @@ export function arrowHeadPoints(end: DiagramPoint, tangentFrom: DiagramPoint): D
   ];
 }
 
-function cubicBounds(segments: readonly CubicSegment[]): LayoutBox {
+export function cubicBounds(segments: readonly CubicSegment[]): LayoutBox {
   const points: DiagramPoint[] = [];
   for (const segment of segments) {
     points.push(segment.from, segment.to);
@@ -237,11 +257,25 @@ function diagramArcExtrema(
   primitive: Extract<DiagramPrimitive, { kind: "arc" }>,
   canvas: LayoutBox,
 ): DiagramPoint[] {
-  const center = mapDiagramPoint(primitive.center, canvas);
-  const radiusX = primitive.radius[0] * canvas.width;
-  const radiusY = primitive.radius[1] * canvas.height;
-  const start = (primitive.start_deg * Math.PI) / 180;
-  const sweep = ((primitive.end_deg - primitive.start_deg) * Math.PI) / 180;
+  return arcExtremaPoints(
+    mapDiagramPoint(primitive.center, canvas),
+    primitive.radius[0] * canvas.width,
+    primitive.radius[1] * canvas.height,
+    primitive.start_deg,
+    primitive.end_deg,
+  );
+}
+
+/** The arc's endpoints and every axis extreme on its sweep (screen degrees), for exact bounds. */
+export function arcExtremaPoints(
+  center: readonly [number, number],
+  radiusX: number,
+  radiusY: number,
+  startDeg: number,
+  endDeg: number,
+): DiagramPoint[] {
+  const start = (startDeg * Math.PI) / 180;
+  const sweep = ((endDeg - startDeg) * Math.PI) / 180;
   const candidates = [start, start + sweep, 0, Math.PI / 2, Math.PI, Math.PI * 1.5];
   return candidates
     .filter((angle) => angleOnSweep(angle, start, sweep))

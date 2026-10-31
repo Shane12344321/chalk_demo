@@ -1,10 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { equationFontSizeForContent } from "./equationSizing";
+import { EQUATION_BASE_FONT_PX, equationFitScale } from "./equationSizing";
 
 describe("shared equation sizing", () => {
-  it("keeps the painter and precommit font decision inside one closed range", () => {
-    expect(equationFontSizeForContent("x=1", 300)).toBe(30);
-    expect(equationFontSizeForContent("x".repeat(100), 300)).toBe(10);
-    expect(equationFontSizeForContent("\\frac{dy}{dx}=2x", 700)).toBeLessThanOrEqual(31);
+  it("paints every equation from one base size and only ever shrinks it", () => {
+    expect(EQUATION_BASE_FONT_PX).toBe(31);
+    expect(equationFitScale({ width: 600, height: 60 }, { width: 300, height: 120 })).toBe(0.5);
   });
 });

@@ -75,8 +75,8 @@ def test_health_reports_configuration_without_secret_values() -> None:
         },
         "board": {
             "configured": True,
-            "model": "gpt-5.6-luna",
-            "reasoning_effort": "none",
+            "model": "gpt-6.1-sol",
+            "reasoning_effort": "low",
         },
         "renderer": {
             "tldraw_license_configured": False,
@@ -415,6 +415,33 @@ def test_settings_reject_secret_like_or_unreviewed_public_configuration(
 ) -> None:
     with pytest.raises(ValidationError):
         settings(**{field: value})
+
+
+@pytest.mark.parametrize("model", ["gpt-6.1-sol", "gpt-6-astra"])
+def test_settings_reject_no_reasoning_for_models_that_require_it(model: str) -> None:
+    with pytest.raises(ValidationError):
+        settings(board_model=model, board_reasoning_effort="none")
+
+
+def test_reasoning_effort_adds_output_token_headroom() -> None:
+    assert (
+        settings(
+            board_model="gpt-6-luna", board_reasoning_effort="none"
+        ).board_output_token_headroom
+        == 0
+    )
+    assert (
+        settings(
+            board_model="gpt-6.1-sol", board_reasoning_effort="low"
+        ).board_output_token_headroom
+        == 4_000
+    )
+    assert (
+        settings(
+            board_model="gpt-6.1-sol", board_reasoning_effort="medium"
+        ).board_output_token_headroom
+        == 12_000
+    )
 
 
 def test_session_rejects_oversized_content_length_before_json_parsing() -> None:

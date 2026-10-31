@@ -1,4 +1,5 @@
-import type { DiagramPrimitive, LessonOp } from "./lesson.generated";
+import type { DiagramPrimitive, FigureMark, LessonOp } from "./lesson.generated";
+import { staggerProgress } from "./scene/motion";
 
 const MIN_WEIGHT = 0.5;
 const MAX_WEIGHT = 4;
@@ -30,6 +31,41 @@ export function opWeight(op: LessonOp): number {
       return clampWeight(
         0.6 + op.primitives.reduce((sum, primitive) => sum + diagramPrimitiveWeight(primitive), 0),
       );
+    case "figure":
+      return clampWeight(
+        ("frame" in op && (op.frame.axes ?? "none") !== "none" ? 1.2 : 0.4) +
+          op.marks.reduce((sum, mark) => sum + figureMarkWeight(mark), 0),
+      );
+  }
+}
+
+/** Drawing time of one figure mark, in the same units as op weights. */
+function figureMarkWeight(mark: FigureMark): number {
+  switch (mark.kind) {
+    case "point":
+      return 0.25;
+    case "segment":
+    case "tangent":
+    case "perpendicular":
+    case "measure":
+      return 0.5;
+    case "polyline":
+      return 0.35 + mark.points.length * 0.08;
+    case "circle":
+    case "arc":
+    case "angle":
+      return 0.6;
+    case "fn":
+    case "param":
+    case "polar":
+      return 1.2;
+    case "shade":
+      return 0.5;
+    case "text":
+      return 0.3 + mark.text.length / 24;
+    case "group":
+      return mark.marks.reduce((sum, child) => sum + figureMarkWeight(child), 0) *
+        Math.min(4, mark.repeat ?? 1) * 0.6;
   }
 }
 
@@ -63,11 +99,8 @@ export function opProgress(
   opIndex: number,
   stepProgress: number,
 ): number {
-  const weights = ops.map(opWeight);
-  const total = weights.reduce((sum, weight) => sum + weight, 0);
-  const before = weights.slice(0, opIndex).reduce((sum, weight) => sum + weight, 0);
-  const own = weights[opIndex] ?? 1;
-  return clamp((clamp(stepProgress) * total - before) / own);
+  // A step's ops run in turn, each taking its weight's share of the narration.
+  return staggerProgress(ops.map(opWeight), opIndex, stepProgress);
 }
 
 export function estimateNarrationDuration(script: string): number {

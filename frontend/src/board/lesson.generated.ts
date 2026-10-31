@@ -2,7 +2,7 @@
 
 export type ElementId = string;
 export type LessonOp =
-  TextOp | EquationOp | SketchOp | AxesOp | CurveOp | DiagramOp | LineOp | ArrowOp | PointOp | AngleArcOp;
+  TextOp | EquationOp | SketchOp | AxesOp | CurveOp | DiagramOp | LineOp | ArrowOp | PointOp | AngleArcOp | FigureOp;
 export type TextOp = TextRegionOp | TextAnchorOp;
 export type Region =
   "A1" | "A2" | "A3" | "B1" | "B2" | "B3" | "C1" | "C2" | "C3" | "D1" | "D2" | "D3" | "left" | "right" | "full";
@@ -38,13 +38,69 @@ export type PointOp = PointRegionOp | PointCanvasOp | PointConstructionOp;
 export type PointConstruction =
   AlongConstruction | MidpointConstruction | IntersectionConstruction | OffsetConstruction;
 export type AngleArcOp = AngleArcRegionOp | AngleArcCanvasOp;
+export type FigureOp = FigureRegionOp | FigureOnOp;
+/**
+ * @minItems 2
+ * @maxItems 2
+ */
+export type FigureRange = [FigureNumber, FigureNumber];
+export type FigureNumber = number;
+export type FigureMark = FigureLeafMark | FigureGroupMark;
+export type FigureLeafMark =
+  | FigurePointMark
+  | FigureSegmentMark
+  | FigurePolylineMark
+  | FigureCircleMark
+  | FigureArcMark
+  | FigureFnMark
+  | FigureParamMark
+  | FigurePolarMark
+  | FigureShadeUnderMark
+  | FigureShadeBetweenMark
+  | FigureShadeInsideMark
+  | FigureAngleMark
+  | FigureTangentMark
+  | FigurePerpendicularMark
+  | FigureMeasureMark
+  | FigureTextMark;
+export type FigurePoint =
+  | FigureRange
+  | {
+      at: ElementId;
+    }
+  | {
+      /**
+       * @minItems 2
+       * @maxItems 2
+       */
+      mid: [ElementId, ElementId];
+    }
+  | {
+      on: ElementId;
+      x: FigureNumber;
+    }
+  | {
+      on: ElementId;
+      t: number;
+    }
+  | {
+      /**
+       * @minItems 2
+       * @maxItems 2
+       */
+      hit: [ElementId, ElementId];
+    }
+  | {
+      foot: ElementId;
+      onto: ElementId;
+    };
 export type LayoutRelation = LayoutPlace | LayoutAlign | LayoutStack | LayoutDistribute;
 
 /**
  * CHALK M2 deterministic lesson wire contract.
  */
 export interface LessonProgram {
-  schema_version: "1.0" | "1.1" | "1.2" | "1.3" | "1.4";
+  schema_version: "1.0" | "1.1" | "1.2" | "1.3" | "1.4" | "1.5";
   title: string;
   /**
    * @minItems 1
@@ -680,6 +736,450 @@ export interface AngleArcCanvasOp {
   end_deg: number;
   stroke: StrokeStyle;
   label?: string;
+}
+export interface FigureRegionOp {
+  op: "figure";
+  id: ElementId;
+  region: Region;
+  frame: FigureFrame;
+  /**
+   * @minItems 1
+   * @maxItems 16
+   */
+  marks:
+    | [FigureMark]
+    | [FigureMark, FigureMark]
+    | [FigureMark, FigureMark, FigureMark]
+    | [FigureMark, FigureMark, FigureMark, FigureMark]
+    | [FigureMark, FigureMark, FigureMark, FigureMark, FigureMark]
+    | [FigureMark, FigureMark, FigureMark, FigureMark, FigureMark, FigureMark]
+    | [FigureMark, FigureMark, FigureMark, FigureMark, FigureMark, FigureMark, FigureMark]
+    | [FigureMark, FigureMark, FigureMark, FigureMark, FigureMark, FigureMark, FigureMark, FigureMark]
+    | [FigureMark, FigureMark, FigureMark, FigureMark, FigureMark, FigureMark, FigureMark, FigureMark, FigureMark]
+    | [
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark
+      ]
+    | [
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark
+      ]
+    | [
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark
+      ]
+    | [
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark
+      ]
+    | [
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark
+      ]
+    | [
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark
+      ]
+    | [
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark
+      ];
+  meaning?: string;
+}
+export interface FigureFrame {
+  x: FigureRange;
+  y: FigureRange;
+  axes?: "edge" | "origin" | "none";
+  grid?: boolean;
+  equal_scale?: boolean;
+  x_label?: string;
+  y_label?: string;
+}
+export interface FigurePointMark {
+  kind: "point";
+  id?: ElementId;
+  at: FigurePoint;
+  label?: string;
+}
+export interface FigureSegmentMark {
+  kind: "segment";
+  id?: ElementId;
+  from: FigurePoint;
+  to: FigurePoint;
+  arrow?: boolean;
+  stroke?: StrokeStyle;
+  label?: string;
+}
+export interface FigurePolylineMark {
+  kind: "polyline";
+  id?: ElementId;
+  /**
+   * @minItems 2
+   * @maxItems 24
+   */
+  points: [FigurePoint, FigurePoint, ...FigurePoint[]];
+  closed?: boolean;
+  smooth?: boolean;
+  arrow?: boolean;
+  fill?: boolean;
+  stroke?: StrokeStyle;
+  label?: string;
+}
+export interface FigureCircleMark {
+  kind: "circle";
+  id?: ElementId;
+  center: FigurePoint;
+  r: number;
+  fill?: boolean;
+  stroke?: StrokeStyle;
+  label?: string;
+}
+export interface FigureArcMark {
+  kind: "arc";
+  id?: ElementId;
+  center: FigurePoint;
+  r: number;
+  start: number;
+  end: number;
+  arrow?: boolean;
+  stroke?: StrokeStyle;
+  label?: string;
+}
+export interface FigureFnMark {
+  kind: "fn";
+  id?: ElementId;
+  y: string;
+  domain?: FigureRange;
+  stroke?: StrokeStyle;
+  label?: string;
+}
+export interface FigureParamMark {
+  kind: "param";
+  id?: ElementId;
+  x: string;
+  y: string;
+  t: FigureRange;
+  stroke?: StrokeStyle;
+  label?: string;
+}
+export interface FigurePolarMark {
+  kind: "polar";
+  id?: ElementId;
+  r: string;
+  theta: FigureRange;
+  stroke?: StrokeStyle;
+  label?: string;
+}
+export interface FigureShadeUnderMark {
+  kind: "shade";
+  id?: ElementId;
+  under: ElementId;
+  from?: FigureNumber;
+  to?: FigureNumber;
+  label?: string;
+}
+export interface FigureShadeBetweenMark {
+  kind: "shade";
+  id?: ElementId;
+  /**
+   * @minItems 2
+   * @maxItems 2
+   */
+  between: [ElementId, ElementId];
+  from?: FigureNumber;
+  to?: FigureNumber;
+  label?: string;
+}
+export interface FigureShadeInsideMark {
+  kind: "shade";
+  id?: ElementId;
+  inside: ElementId;
+  /**
+   * @minItems 1
+   * @maxItems 4
+   */
+  except?:
+    | [ElementId]
+    | [ElementId, ElementId]
+    | [ElementId, ElementId, ElementId]
+    | [ElementId, ElementId, ElementId, ElementId];
+  label?: string;
+}
+export interface FigureAngleMark {
+  kind: "angle";
+  id?: ElementId;
+  at: FigurePoint;
+  from: FigurePoint;
+  to: FigurePoint;
+  r?: number;
+  label?: string;
+}
+export interface FigureTangentMark {
+  kind: "tangent";
+  id?: ElementId;
+  to: ElementId;
+  x: FigureNumber;
+  length?: number;
+  stroke?: StrokeStyle;
+  label?: string;
+}
+export interface FigurePerpendicularMark {
+  kind: "perpendicular";
+  id?: ElementId;
+  to: ElementId;
+  through: FigurePoint;
+  length?: number;
+  stroke?: StrokeStyle;
+  label?: string;
+}
+export interface FigureMeasureMark {
+  kind: "measure";
+  id?: ElementId;
+  from: FigurePoint;
+  to: FigurePoint;
+  label: string;
+}
+export interface FigureTextMark {
+  kind: "text";
+  id?: ElementId;
+  at: FigurePoint;
+  text: string;
+  align?: "left" | "center" | "right";
+  size?: "small" | "normal" | "large";
+}
+export interface FigureGroupMark {
+  kind: "group";
+  id?: ElementId;
+  /**
+   * @minItems 1
+   * @maxItems 8
+   */
+  marks:
+    | [FigureLeafMark]
+    | [FigureLeafMark, FigureLeafMark]
+    | [FigureLeafMark, FigureLeafMark, FigureLeafMark]
+    | [FigureLeafMark, FigureLeafMark, FigureLeafMark, FigureLeafMark]
+    | [FigureLeafMark, FigureLeafMark, FigureLeafMark, FigureLeafMark, FigureLeafMark]
+    | [FigureLeafMark, FigureLeafMark, FigureLeafMark, FigureLeafMark, FigureLeafMark, FigureLeafMark]
+    | [FigureLeafMark, FigureLeafMark, FigureLeafMark, FigureLeafMark, FigureLeafMark, FigureLeafMark, FigureLeafMark]
+    | [
+        FigureLeafMark,
+        FigureLeafMark,
+        FigureLeafMark,
+        FigureLeafMark,
+        FigureLeafMark,
+        FigureLeafMark,
+        FigureLeafMark,
+        FigureLeafMark
+      ];
+  mirror?: "x" | "y";
+  rotate?: number;
+  scale?: number;
+  translate?: FigureRange;
+  origin?: FigureRange;
+  repeat?: number;
+}
+export interface FigureOnOp {
+  op: "figure";
+  id: ElementId;
+  on: ElementId;
+  /**
+   * @minItems 1
+   * @maxItems 16
+   */
+  marks:
+    | [FigureMark]
+    | [FigureMark, FigureMark]
+    | [FigureMark, FigureMark, FigureMark]
+    | [FigureMark, FigureMark, FigureMark, FigureMark]
+    | [FigureMark, FigureMark, FigureMark, FigureMark, FigureMark]
+    | [FigureMark, FigureMark, FigureMark, FigureMark, FigureMark, FigureMark]
+    | [FigureMark, FigureMark, FigureMark, FigureMark, FigureMark, FigureMark, FigureMark]
+    | [FigureMark, FigureMark, FigureMark, FigureMark, FigureMark, FigureMark, FigureMark, FigureMark]
+    | [FigureMark, FigureMark, FigureMark, FigureMark, FigureMark, FigureMark, FigureMark, FigureMark, FigureMark]
+    | [
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark
+      ]
+    | [
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark
+      ]
+    | [
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark
+      ]
+    | [
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark
+      ]
+    | [
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark
+      ]
+    | [
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark
+      ]
+    | [
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark,
+        FigureMark
+      ];
+  meaning?: string;
 }
 export interface LayoutPlace {
   kind: "place";

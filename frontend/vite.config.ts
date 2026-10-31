@@ -1,17 +1,21 @@
 import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
+import { chalkLessonSourcePlugin } from "./devtools/lessonSource";
 
 export default defineConfig(({ mode }) => ({
-  plugins: [react()],
+  // The lesson source is dev-server only (`apply: "serve"`); it backs the
+  // board gallery at /gallery.html and never reaches a production build.
+  plugins: [react(), chalkLessonSourcePlugin()],
   server: {
     host: "localhost",
     port: 5173,
     strictPort: true,
-    // Retained model output is evidence, not an application asset. Permit only
-    // the pinned batch directory, and only while Vitest is replaying it.
+    // Retained model output is evidence, not an application asset. Permit the
+    // evidence directory only while Vitest replays it (offline rescore and
+    // the scene-pipeline parity test); never in dev or build.
     ...(mode === "test" ? {
       fs: {
-        allow: ["../artifacts/evidence/m3-luna-v2-batch-20260717-0635/raw"],
+        allow: ["../artifacts/evidence"],
       },
     } : {}),
   },

@@ -11,6 +11,7 @@ import { AnnotationOverlayLayer } from "./annotationOverlays";
 import type { BoardProps } from "./Board";
 import { BOARD_HEIGHT, BOARD_WIDTH } from "./layout";
 import { OverlayLayer } from "./overlays";
+import { configuredScenePipeline } from "./boardRendererConfig";
 import { RoughSvgBoardRenderer } from "./renderer";
 import { resolveLocalApiBaseUrl } from "../realtime/localApi";
 import { loadTldrawLicenseKey } from "./tldrawLicense";
@@ -36,9 +37,13 @@ export default function TldrawBoard({
   onFirstVisibleInk,
   measurementCache,
   renderContext,
+  scenePipeline,
 }: BoardProps) {
+  const pipeline = scenePipeline ?? configuredScenePipeline(import.meta.env.VITE_CHALK_SCENE);
   const rendererRef = useRef<RoughSvgBoardRenderer>();
-  if (!rendererRef.current) rendererRef.current = new RoughSvgBoardRenderer(measurementCache);
+  if (rendererRef.current?.pipeline !== pipeline) {
+    rendererRef.current = new RoughSvgBoardRenderer(measurementCache, pipeline);
+  }
   const renderer = rendererRef.current;
   const prepared = useMemo(
     () => renderer.prepareLesson(lesson, renderContext),

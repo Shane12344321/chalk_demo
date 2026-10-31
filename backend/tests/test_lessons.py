@@ -963,7 +963,10 @@ def test_lesson_stream_emits_only_validated_chalk_envelopes(caplog) -> None:
     assert response.headers["cache-control"] == "no-store"
     assert response.headers["x-chalk-board-model"] == "gpt-5.6-luna"
     assert response.headers["x-chalk-board-reasoning-effort"] == "none"
-    prompt = lessons_module._prompt("board_engine.md")
+    # The header names whichever prompt the configured version selects (v4 by default).
+    configured = settings()
+    assert configured.board_prompt_version == "v4"
+    prompt = lessons_module._prompt(configured.board_prompt_name, configured.board_contract_version)
     assert (
         response.headers["x-chalk-board-prompt-sha256"]
         == hashlib.sha256(prompt.encode()).hexdigest()
@@ -989,6 +992,7 @@ def test_lesson_stream_emits_only_validated_chalk_envelopes(caplog) -> None:
     assert upstream["store"] is False
     assert upstream["model"] == "gpt-5.6-luna"
     assert upstream["reasoning"] == {"effort": "none"}
+    assert upstream["max_output_tokens"] == lessons_module.MAX_OUTPUT_TOKENS
     assert captured.headers["authorization"] == f"Bearer {API_KEY}"
     assert TOPIC not in caplog.text
     assert json.dumps(step) not in caplog.text
@@ -1280,6 +1284,35 @@ def test_prior_prompt_versions_remain_selectable() -> None:
     snapshot = (lessons_module.PROMPT_DIR / "board_engine_v2.md").read_text(encoding="utf-8")
     assert "Spatial narrative:" in snapshot
     assert "y pointing DOWN" not in snapshot
+
+
+def test_figure_prompt_is_the_default_and_v3_stays_selectable() -> None:
+    default = settings()
+    assert (default.board_prompt_version, default.board_prompt_name) == ("v4", "board_engine_v4.md")
+    assert default.board_contract_version == "v4"
+
+    captured: httpx.Request | None = None
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal captured
+        captured = request
+        return httpx.Response(200, content=sse_for_text(json.dumps(valid_step())))
+
+    spatial = settings(board_prompt_version="v3")
+    assert (spatial.board_prompt_name, spatial.board_contract_version) == ("board_engine.md", "v3")
+    with client_with_transport(handler, app_settings=spatial) as client:
+        response = client.post("/lesson", json=lesson_payload())
+
+    selected_prompt = lessons_module._prompt("board_engine.md", "v3")
+    assert (
+        response.headers["x-chalk-board-prompt-sha256"]
+        == hashlib.sha256(selected_prompt.encode()).hexdigest()
+    )
+    assert captured is not None
+    instructions = json.loads(captured.content)["instructions"]
+    assert instructions == selected_prompt
+    assert "- sketch:" in instructions
+    assert "- figure:" not in instructions
 
 
 def test_qualified_board_prompt_remains_an_explicit_runtime_fallback() -> None:
@@ -1855,3 +1888,34 @@ def test_upstream_transport_budget_remains_bounded(monkeypatch) -> None:
 
     with pytest.raises(ValueError, match="upstream stream exceeds byte budget"):
         parser.feed(b"x" * 11)
+
+
+def test_lesson_stream_logs_token_usage_counts_without_content(caplog) -> None:
+    step = valid_step()
+    events = [
+        {"type": "response.output_text.delta", "delta": json.dumps(step)},
+        {
+            "type": "response.completed",
+            "response": {
+                "id": "resp_test",
+                "usage": {
+                    "input_tokens": 3_600,
+                    "input_tokens_details": {"cached_tokens": 3_200},
+                    "output_tokens": 1_900,
+                    "output_tokens_details": {"reasoning_tokens": 1_100},
+                },
+            },
+        },
+    ]
+    body = "".join(f"data: {json.dumps(event)}\n\n" for event in events).encode()
+
+    caplog.set_level(logging.INFO)
+    with client_with_transport(lambda _request: httpx.Response(200, content=body)) as client:
+        response = client.post("/lesson", json=lesson_payload())
+
+    assert response.status_code == 200
+    assert (
+        "input_tokens=3600 cached_input_tokens=3200 output_tokens=1900 reasoning_tokens=1100"
+        in caplog.text
+    )
+    assert TOPIC not in caplog.text

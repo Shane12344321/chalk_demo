@@ -9,10 +9,15 @@ from pathlib import Path
 from typing import Literal
 from urllib.parse import urlsplit
 
-from pydantic import Field, SecretStr, field_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+# GPT-6 Astra and 6.1 Sol do not accept `reasoning.effort: none`.
+REASONING_REQUIRED_BOARD_MODELS = frozenset({"gpt-6.1-sol", "gpt-6-astra"})
+# Reasoning tokens count against max_output_tokens; `medium` reasons longer.
+REASONING_OUTPUT_TOKEN_HEADROOM = {"none": 0, "low": 4_000, "medium": 12_000}
 
 
 class Settings(BaseSettings):
@@ -37,15 +42,18 @@ class Settings(BaseSettings):
     realtime_voice: Literal["marin", "cedar"] = "marin"
     sync_mode: Literal["fixed", "paced"] = "fixed"
     board_model: Literal[
+        "gpt-6.1-sol",
+        "gpt-6-luna",
+        "gpt-6-astra",
         "gpt-5.6-luna",
         "gpt-5.6-terra",
         "gpt-5.6-sol",
-    ] = "gpt-5.6-luna"
-    board_reasoning_effort: Literal["none", "low"] = "none"
-    board_prompt_version: Literal["v1", "v2", "v3"] = "v3"
-    lesson_generation_timeout_seconds: float = Field(default=30.0, gt=0, le=60)
+    ] = "gpt-6.1-sol"
+    board_reasoning_effort: Literal["none", "low", "medium"] = "low"
+    board_prompt_version: Literal["v1", "v2", "v3", "v4"] = "v4"
+    lesson_generation_timeout_seconds: float = Field(default=45.0, gt=0, le=60)
     lesson_max_concurrent: int = Field(default=2, ge=1, le=4)
-    annotation_generation_timeout_seconds: float = Field(default=15.0, gt=0, le=30)
+    annotation_generation_timeout_seconds: float = Field(default=25.0, gt=0, le=30)
     annotation_max_concurrent: int = Field(default=1, ge=1, le=2)
     annotation_whitespace: Literal["off", "bounded"] = "off"
     frontend_origin: str = "http://localhost:5173"
@@ -85,6 +93,24 @@ class Settings(BaseSettings):
             raise ValueError("SAFETY_IDENTIFIER_SALT must be a nonempty printable string")
         return value
 
+    @model_validator(mode="after")
+    def validate_board_reasoning_effort(self) -> "Settings":
+        """Reject effort values the selected board model does not accept upstream."""
+
+        if self.board_model in REASONING_REQUIRED_BOARD_MODELS and (
+            self.board_reasoning_effort == "none"
+        ):
+            raise ValueError(
+                f"BOARD_MODEL={self.board_model} requires BOARD_REASONING_EFFORT=low or medium"
+            )
+        return self
+
+    @property
+    def board_output_token_headroom(self) -> int:
+        """Extra output budget for reasoning tokens, which count against max_output_tokens."""
+
+        return REASONING_OUTPUT_TOKEN_HEADROOM[self.board_reasoning_effort]
+
     @property
     def has_openai_api_key(self) -> bool:
         """Report configuration state without exposing the configured value."""
@@ -99,13 +125,21 @@ class Settings(BaseSettings):
 
     @property
     def board_prompt_name(self) -> str:
-        """Select the qualified fallback, accumulated-whiteboard, or spatial-contract prompt."""
+        """Select the figure-contract (default), spatial-contract, or an earlier retained prompt."""
 
         if self.board_prompt_version == "v1":
             return "board_engine_v1.md"
         if self.board_prompt_version == "v2":
             return "board_engine_v2.md"
+        if self.board_prompt_version == "v4":
+            return "board_engine_v4.md"
         return "board_engine.md"
+
+    @property
+    def board_contract_version(self) -> Literal["v3", "v4"]:
+        """Prompt v4 teaches schema-1.5 figures; every earlier prompt keeps schema 1.4."""
+
+        return "v4" if self.board_prompt_version == "v4" else "v3"
 
 
 @lru_cache(maxsize=1)

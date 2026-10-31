@@ -24,7 +24,7 @@
       "pattern": "^v1\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]{43}$"
     },
     "model": {
-      "enum": ["gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol"]
+      "enum": ["gpt-6.1-sol", "gpt-6-luna", "gpt-6-astra", "gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol"]
     },
     "reasoningEffort": {
       "enum": ["none", "low"]

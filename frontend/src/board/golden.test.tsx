@@ -2,7 +2,7 @@ import { render } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { Board } from "./Board";
 import { decodeLesson } from "./decode";
-import { layoutSteps, type LayoutBox } from "./layout";
+import { layoutSteps, overlapRatio } from "./layout";
 
 const fixtures = import.meta.glob("../../../tests/golden/*.lesson.json", {
   eager: true,
@@ -48,16 +48,3 @@ describe("ten golden lesson renderer fixtures", () => {
     });
   }
 });
-
-function overlapRatio(left: LayoutBox, right: LayoutBox): number {
-  const width = Math.max(
-    0,
-    Math.min(left.x + left.width, right.x + right.width) - Math.max(left.x, right.x),
-  );
-  const height = Math.max(
-    0,
-    Math.min(left.y + left.height, right.y + right.height) - Math.max(left.y, right.y),
-  );
-  const smallerArea = Math.min(left.width * left.height, right.width * right.height);
-  return smallerArea === 0 ? 0 : (width * height) / smallerArea;
-}

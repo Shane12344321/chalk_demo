@@ -52,7 +52,7 @@ describe("Realtime protocol builders", () => {
         truncation: {
           type: "retention_ratio",
           retention_ratio: 0.8,
-          token_limits: { post_instructions: 4_000 },
+          token_limits: { post_instructions: 16_000 },
         },
       },
     });

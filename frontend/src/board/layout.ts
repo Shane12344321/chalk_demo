@@ -9,7 +9,7 @@ import {
   type ConstructionOp,
   type ResolvedConstruction,
 } from "./construction";
-import { diagramBounds } from "./diagramGeometry";
+import { diagramBounds, mapDiagramPoint } from "./diagramGeometry";
 import type { LayoutLintIssue } from "./layoutLint";
 import type { RootMeasurement } from "./precommitMeasurement";
 
@@ -308,8 +308,8 @@ export function layoutSteps(
         }
         canvasBox = construction.canvas;
         box = constructionBounds(construction);
-      } else if (op.op === "curve") {
-        const axesBox = boxes.get(op.axes_id);
+      } else if (followsParent(op)) {
+        const axesBox = boxes.get(op.op === "curve" ? op.axes_id : op.on);
         if (!axesBox) {
           options.onWarning?.({
             id: op.id,
@@ -331,7 +331,9 @@ export function layoutSteps(
             return;
           }
         } else {
-          canvasBox = allocateRegionBox(op.region, intrinsicSize(op, options.measurements), regionCursors);
+          canvasBox = squareDiagramCanvas(
+            allocateRegionBox(op.region, intrinsicSize(op, options.measurements), regionCursors),
+          );
           if (!placeRelationIds.has(op.id)) {
             canvasBox = resolveCollision(
               canvasBox,
@@ -345,6 +347,10 @@ export function layoutSteps(
               options.occupancyExpectations,
               options.candidatePlacement,
             );
+          }
+          if (!placeRelationIds.has(op.id) && options.candidatePlacement !== "preferred-only") {
+            const diagramOp = op;
+            canvasBox = clearPlacement(canvasBox, result, (candidate) => diagramElementBounds(diagramOp, candidate));
           }
         }
         box = diagramElementBounds(op, canvasBox);
@@ -369,7 +375,7 @@ export function layoutSteps(
       }
       if (
         !construction &&
-        op.op !== "curve" &&
+        !followsParent(op) &&
         !isDiagramOp(op) &&
         !placeRelationIds.has(op.id)
       ) {
@@ -385,6 +391,7 @@ export function layoutSteps(
           options.occupancyExpectations,
           options.candidatePlacement,
         );
+        if (options.candidatePlacement !== "preferred-only") box = clearPlacement(box, result);
       }
       boxes.set(op.id, box);
       if (canvasBox) coordinateSpaces.set(op.id, canvasBox);
@@ -431,7 +438,7 @@ function applyLayoutRelations(
       if (!moving || !reference) continue;
       const target = relativeLayoutBox(moving, reference, relation);
       const item = result.find(({ op }) => op.id === relation.id);
-      if (!item || item.op.op === "curve") continue;
+      if (!item || followsParent(item.op)) continue;
       const alternatives = (["above", "below", "left", "right"] as const)
         .filter((side) => side !== relation.side)
         .map((side) => relativeLayoutBox(moving, reference, { ...relation, side }));
@@ -542,7 +549,7 @@ function applyLayoutRelations(
 function isMovableRoot(result: readonly LaidOutOp[], id: string): boolean {
   const item = result.find(({ op }) => op.id === id);
   return Boolean(
-    item && !item.construction && item.op.op !== "curve" && !("canvas_id" in item.op),
+    item && !item.construction && !followsParent(item.op) && !("canvas_id" in item.op),
   );
 }
 
@@ -597,7 +604,7 @@ function translateRoot(
     if (canvasBox) coordinateSpaces.set(id, canvasBox);
     for (const candidate of result) {
       if (
-        (candidate.op.op === "curve" && candidate.op.axes_id === id) ||
+        parentOf(candidate.op) === id ||
         ("canvas_id" in candidate.op && candidate.op.canvas_id === id) ||
         ("anchor" in candidate.op && candidate.op.anchor.el === id)
       ) {
@@ -647,6 +654,60 @@ function isLayoutBox(box: LayoutBox | undefined): box is LayoutBox {
   return box !== undefined;
 }
 
+/**
+ * A diagram's normalized [0,1]² canvas must scale uniformly: a stretched canvas
+ * draws circles as ellipses and makes angle arcs, perpendiculars, and slopes
+ * disagree with the geometry they label.
+ */
+function squareDiagramCanvas(box: LayoutBox): LayoutBox {
+  const side = Math.min(box.width, box.height);
+  return { x: box.x + (box.width - side) / 2, y: box.y, width: side, height: side };
+}
+
+/** Any intrusion beyond this share of the smaller box counts as an overlap. */
+const CLEAR_OVERLAP_RATIO = 0.02;
+const CLEAR_SCAN_STEP = 24;
+const CLEAR_SCALES = [1, 0.85, 0.72, 0.6] as const;
+
+/**
+ * The board-wide no-overlap guarantee for roots. Whatever placement scoring
+ * chose, a root that still intrudes on a committed root moves to the nearest
+ * clear spot, and only if none exists at full size does it shrink (text,
+ * equations, and diagrams all fit whatever box they receive). Committed roots
+ * are never moved, so this is prefix-stable. If nothing fits even at the
+ * smallest scale, the scored placement stands and lints report the overlap.
+ */
+function clearPlacement(
+  preferred: LayoutBox,
+  laidOut: readonly LaidOutOp[],
+  actualBounds: (candidate: LayoutBox) => LayoutBox = (candidate) => candidate,
+): LayoutBox {
+  const obstacles = laidOut.filter((item) => !followsParent(item.op)).map((item) => item.box);
+  const board = boardBox();
+  const isClear = (actual: LayoutBox) =>
+    containsBox(board, actual) &&
+    !obstacles.some((box) => overlapRatio(actual, box) > CLEAR_OVERLAP_RATIO);
+  if (isClear(actualBounds(preferred))) return preferred;
+  const centerX = preferred.x + preferred.width / 2;
+  const centerY = preferred.y + preferred.height / 2;
+  for (const scale of CLEAR_SCALES) {
+    const width = preferred.width * scale;
+    const height = preferred.height * scale;
+    // Actual bounds translate with the box, so measure them once per scale.
+    const origin = actualBounds({ x: 0, y: 0, width, height });
+    let best: { box: LayoutBox; distance: number } | undefined;
+    for (let y = board.y; y + height <= board.y + board.height; y += CLEAR_SCAN_STEP) {
+      for (let x = board.x; x + width <= board.x + board.width; x += CLEAR_SCAN_STEP) {
+        const distance = Math.hypot(x + width / 2 - centerX, y + height / 2 - centerY);
+        if (best && distance >= best.distance) continue;
+        if (isClear(translateBox(origin, x, y))) best = { box: { x, y, width, height }, distance };
+      }
+    }
+    if (best) return best.box;
+  }
+  return preferred;
+}
+
 function allocateRegionBox(
   region: Region,
   size: { width: number; height: number },
@@ -693,7 +754,7 @@ function resolveCollision(
   if (
     containsBox(boardBox(), preferredActual) &&
     !laidOut.some(
-      (item) => item.op.op !== "curve" &&
+      (item) => !followsParent(item.op) &&
         overlapRatio(preferredActual, item.box) > MATERIAL_OVERLAP_RATIO,
     ) &&
     !preferredReferenceIds.some((referenceId) => {
@@ -793,10 +854,10 @@ function regionProbes(
       const leftActual = actual(left);
       const rightActual = actual(right);
       const leftOverlaps = occupied.filter(
-        (item) => item.op.op !== "curve" && overlapRatio(leftActual, item.box) > MATERIAL_OVERLAP_RATIO,
+        (item) => !followsParent(item.op) && overlapRatio(leftActual, item.box) > MATERIAL_OVERLAP_RATIO,
       ).length;
       const rightOverlaps = occupied.filter(
-        (item) => item.op.op !== "curve" && overlapRatio(rightActual, item.box) > MATERIAL_OVERLAP_RATIO,
+        (item) => !followsParent(item.op) && overlapRatio(rightActual, item.box) > MATERIAL_OVERLAP_RATIO,
       ).length;
       return leftOverlaps - rightOverlaps ||
         boxDistance(left, preferred) - boxDistance(right, preferred) ||
@@ -849,10 +910,10 @@ function selectPlacementCandidate(
     const analysis = analyzeBoardOccupancy(hypothetical, occupancyExpectations);
     const overlaps = projected.reduce(
       (total, projectedItem) => total + (
-        projectedItem.op.op === "curve"
+        followsParent(projectedItem.op)
           ? 0
           : occupied.filter(
-              (item) => item.op.op !== "curve" &&
+              (item) => !followsParent(item.op) &&
                 overlapRatio(projectedItem.box, item.box) > MATERIAL_OVERLAP_RATIO,
             ).length
       ),
@@ -869,7 +930,7 @@ function selectPlacementCandidate(
       );
     }).length;
     const boundaryEscapes = projected.filter(
-      (item) => item.op.op !== "curve" && !containsBox(boardBox(), item.box),
+      (item) => !followsParent(item.op) && !containsBox(boardBox(), item.box),
     ).length;
     const crowdedRegions = analysis.findings.filter(
       (finding) => finding.code === "region_crowded",
@@ -994,8 +1055,8 @@ function rootGroupItems(laidOut: readonly LaidOutOp[], rootId: string): LaidOutO
   while (changed) {
     changed = false;
     for (const candidate of laidOut) {
-      const parentId = candidate.op.op === "curve"
-        ? candidate.op.axes_id
+      const parentId = parentOf(candidate.op) !== undefined
+        ? parentOf(candidate.op)
         : "canvas_id" in candidate.op
           ? candidate.op.canvas_id
           : "anchor" in candidate.op
@@ -1033,7 +1094,8 @@ function compareNumberVectors(left: readonly number[], right: readonly number[])
   return 0;
 }
 
-function overlapRatio(left: LayoutBox, right: LayoutBox): number {
+/** Intersection area as a share of the smaller box: the one overlap measure for boxes. */
+export function overlapRatio(left: LayoutBox, right: LayoutBox): number {
   const width = Math.max(
     0,
     Math.min(left.x + left.width, right.x + right.width) - Math.max(left.x, right.x),
@@ -1074,7 +1136,7 @@ function deduplicatedOccupancyElements(
   };
   const elements = new Map<string, OccupancyElement>();
   for (const item of laidOut) {
-    if (item.op.op === "curve" || elements.has(item.op.id)) continue;
+    if (followsParent(item.op) || elements.has(item.op.id)) continue;
     if (
       ![item.box.x, item.box.y, item.box.width, item.box.height].every(Number.isFinite) ||
       item.box.width <= 0 ||
@@ -1413,14 +1475,51 @@ function intrinsicSize(
       return { width: 310, height: 64 };
     case "curve":
       return { width: 0, height: 0 };
+    case "figure":
+      return "frame" in op ? figureSize(op.frame) : { width: 0, height: 0 };
     case "diagram":
-      return { width: 700, height: 430 };
     case "line":
     case "arrow":
     case "point":
     case "angle_arc":
-      return { width: 700, height: 430 };
+      // Square, so the normalized canvas maps uniformly (see squareDiagramCanvas).
+      return { width: 520, height: 520 };
   }
+}
+
+/**
+ * Ops drawn in a parent's coordinate frame (a curve on its axes, `figure on`
+ * marks added to an earlier figure). They own no layout slot: their box is
+ * the parent's, and they move only with it.
+ */
+export function parentOf(op: LessonOp): string | undefined {
+  if (op.op === "curve") return op.axes_id;
+  if (op.op === "figure" && "on" in op) return op.on;
+  return undefined;
+}
+
+function followsParent(
+  op: LessonOp,
+): op is Extract<LessonOp, { op: "curve" }> | Extract<LessonOp, { on: string }> {
+  return parentOf(op) !== undefined;
+}
+
+/** Plot frames take the axes slot; other frames take a slot with their window's aspect. */
+function figureSize(frame: Extract<LessonOp, { op: "figure"; frame: unknown }>["frame"]): {
+  width: number;
+  height: number;
+} {
+  const axes = frame.axes ?? "none";
+  const equal = frame.equal_scale ?? axes === "none";
+  if (!equal) return { width: 700, height: 430 };
+  const spanX = frame.x[1] - frame.x[0];
+  const spanY = frame.y[1] - frame.y[0];
+  const [marginX, marginY] = axes === "none" ? [24, 24] : [82, 76];
+  const scale = Math.min((620 - marginX) / spanX, (480 - marginY) / spanY);
+  return {
+    width: Math.max(160, spanX * scale + marginX),
+    height: Math.max(140, spanY * scale + marginY),
+  };
 }
 
 function isDiagramOp(
@@ -1443,11 +1542,11 @@ function diagramElementBounds(
   }
   if (op.op === "point") {
     if (!("at" in op)) throw new Error("Unresolved point construction reached canvas layout.");
-    const [x, y] = canvasPoint(op.at, canvas);
+    const [x, y] = mapDiagramPoint(op.at, canvas);
     return { x: x - padding, y: y - padding, width: padding * 2, height: padding * 2 };
   }
   if (op.op === "angle_arc") {
-    const [x, y] = canvasPoint(op.center, canvas);
+    const [x, y] = mapDiagramPoint(op.center, canvas);
     const radius = op.radius * Math.min(canvas.width, canvas.height);
     return {
       x: x - radius - padding,
@@ -1457,18 +1556,14 @@ function diagramElementBounds(
     };
   }
   if (!("from" in op)) throw new Error("Unresolved line construction reached canvas layout.");
-  const [fromX, fromY] = canvasPoint(op.from, canvas);
-  const [toX, toY] = canvasPoint(op.to, canvas);
+  const [fromX, fromY] = mapDiagramPoint(op.from, canvas);
+  const [toX, toY] = mapDiagramPoint(op.to, canvas);
   return {
     x: Math.min(fromX, toX) - padding,
     y: Math.min(fromY, toY) - padding,
     width: Math.abs(toX - fromX) + padding * 2,
     height: Math.abs(toY - fromY) + padding * 2,
   };
-}
-
-function canvasPoint(point: readonly [number, number], canvas: LayoutBox): [number, number] {
-  return [canvas.x + point[0] * canvas.width, canvas.y + point[1] * canvas.height];
 }
 
 function visibleLatexLength(latex: string): number {

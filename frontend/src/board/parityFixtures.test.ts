@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import curveParity from "../../../shared/fixtures/curve-parity.json";
 import latexParity from "../../../shared/fixtures/latex-parity.json";
 import sanitizerParity from "../../../shared/fixtures/sanitizer-parity.json";
-import { sampleVisibleCurveSegments } from "./expression";
+import { sampleVisibleCurveSegments } from "./scene/sample";
 import { renderSafeLatex } from "./latex";
 import { sanitizeStep, type SanitizationCode } from "./sanitize";
 

@@ -1,0 +1,16 @@
+{
+  "schema": "chalk.drawing-suite-quality.v1",
+  "source": "frontend/gallery.html?dir=artifacts/evidence/suite40-v3-sol-20261019/ (production Board, boardQuality.ts), 2026-10-19",
+  "boards": 40,
+  "clean": 34,
+  "issues": { "overlap": 7, "clipped_equation": 0, "outside_board": 0, "small_text": 0, "short_last_line": 0 },
+  "mean_board_coverage": 0.197,
+  "dirty": {
+    "geo-centroid": "sideca overlaps medianbe (36%)",
+    "mech-incline": "parallel overlaps accel (46%)",
+    "prob-geometric": "side overlaps areanote (100%)",
+    "prob-tree": "thbranch overlaps ttbranch (13%)",
+    "trig-unit-circle": "topradius overlaps quarter (22%)",
+    "wave-doppler": "title overlaps assume (13%); waves overlaps listener (14%)"
+  }
+}

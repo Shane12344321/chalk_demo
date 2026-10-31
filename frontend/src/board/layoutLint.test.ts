@@ -20,8 +20,9 @@ describe("deterministic board geometry lints", () => {
     });
   });
 
-  it("reports a diagram label that escapes its shared canvas", () => {
-    const item = geometry("ray1", [{ text: "outside", x: 90, y: 90 }]);
+  it("reports a label that leaves the board", () => {
+    // Labels may use free board space beside their canvas; only the board edge bounds them.
+    const item = geometry("ray1", [{ text: "outside", x: 1590, y: 90 }]);
     item.canvasBox = { x: 100, y: 100, width: 400, height: 300 };
     expect(lintBoardGeometry([item])).toContainEqual({
       code: "label_out_of_bounds",
@@ -40,12 +41,13 @@ describe("deterministic board geometry lints", () => {
     });
   });
 
-  it("reports an automatically placed label that covers diagram ink", () => {
+  it("reports an automatically placed label that crosses drawn ink", () => {
     const item = geometry("diagram1", [
       { text: "force", x: 300, y: 315, anchor: "middle", autoPlace: true },
     ]);
     item.kind = "diagram";
-    item.inkBounds = [{ x: 180, y: 295, width: 240, height: 20 }];
+    // A stroke running straight through the label, judged on the stroke itself.
+    item.paths = [{ d: "M 180 300 L 420 300", stroke: "#2b2e36", strokeWidth: 4, fill: "none" }];
     expect(lintBoardGeometry([item])).toContainEqual({
       code: "label_ink_overlap",
       elementIds: ["diagram1"],

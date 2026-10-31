@@ -1,5 +1,5 @@
 import type { BoardGeometry } from "./geometry";
-import { BOARD_HEIGHT, BOARD_WIDTH, type LayoutBox } from "./layout";
+import { BOARD_HEIGHT, BOARD_WIDTH, overlapRatio, type LayoutBox } from "./layout";
 import { groupLayoutLintIssues, type LayoutLintIssue } from "./layoutLint";
 
 const MATERIAL_OVERLAP_RATIO = 0.15;
@@ -52,8 +52,9 @@ export function measureRenderedBoard(
   const geometryById = new Map(geometries.map((geometry) => [geometry.id, geometry]));
   const marks: MeasuredBoardMark[] = [];
   for (const node of svg.querySelectorAll<SVGGraphicsElement>("[data-board-mark]")) {
-    const owner = node.closest<SVGGElement>("[data-element-id]");
-    const elementId = owner?.dataset.elementId;
+    // Labels live in the board's top label layer, tagged with their element.
+    const owner = node.closest<SVGGElement>("[data-element-id], [data-label-for]");
+    const elementId = owner?.dataset.elementId ?? owner?.dataset.labelFor;
     if (!elementId) continue;
     const geometry = geometryById.get(elementId);
     if (!geometry) continue;
@@ -94,17 +95,4 @@ function containsWithTolerance(boundary: LayoutBox, box: LayoutBox): boolean {
     box.x + box.width <= boundary.x + boundary.width + BOUNDARY_TOLERANCE &&
     box.y + box.height <= boundary.y + boundary.height + BOUNDARY_TOLERANCE
   );
-}
-
-function overlapRatio(left: LayoutBox, right: LayoutBox): number {
-  const width = Math.max(
-    0,
-    Math.min(left.x + left.width, right.x + right.width) - Math.max(left.x, right.x),
-  );
-  const height = Math.max(
-    0,
-    Math.min(left.y + left.height, right.y + right.height) - Math.max(left.y, right.y),
-  );
-  const smallerArea = Math.min(left.width * left.height, right.width * right.height);
-  return smallerArea === 0 ? 0 : (width * height) / smallerArea;
 }

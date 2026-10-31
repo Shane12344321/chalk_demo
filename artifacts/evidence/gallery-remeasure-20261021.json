@@ -1,0 +1,29 @@
+{
+  "schema": "chalk.gallery-remeasure.v1",
+  "date": "2026-10-21",
+  "change": "frontend/src/gallery/boardQuality.ts counts only visible ink: invisible reveal-timing paths (stroke and fill none/transparent, drawn under every figure text mark) are skipped, and a translucent tint fill (alpha <= 0.35, e.g. DIAGRAM_FILL) is footprint, not an obstacle for text. Same NDJSON, same 2026-10-21 renderer, no model calls.",
+  "clean_boards": {
+    "v3 2026-10-19": {
+      "before": 36,
+      "after": 36,
+      "overlaps_after": 5
+    },
+    "v4 2026-10-19": {
+      "before": 32,
+      "after": 35,
+      "overlaps_after": 6
+    },
+    "v4 2026-10-21a": {
+      "before": 31,
+      "after": 38,
+      "overlaps_after": 2
+    },
+    "v4 2026-10-21b": {
+      "before": 27,
+      "after": 31,
+      "overlaps_after": 10,
+      "clipped_equation": "trig-amplitude rule, 10.4 px"
+    }
+  },
+  "remaining_v4_overlaps": "every solver-visible one is ink from a later step over an earlier label; one involves a model-placed text mark (wave-standing 'fixed', 2026-10-19)"
+}

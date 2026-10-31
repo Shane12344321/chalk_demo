@@ -29,7 +29,7 @@ Prerequisites:
 - Node.js `^20.19.0` or `>=22.12.0` with npm (the current development machine uses Node 25 and npm 11).
 - [`uv`](https://docs.astral.sh/uv/) for the Python environment.
 - A current Chromium-family browser with localhost microphone permission for the live check.
-- An OpenAI API key with access to `gpt-realtime-2.1-mini` for voice and `gpt-5.6-luna` for live M3 lesson generation.
+- An OpenAI API key with access to `gpt-realtime-2.1-mini` for voice and `gpt-6.1-sol` for live lesson generation.
 
 From the repository root:
 
@@ -48,17 +48,18 @@ Add `OPENAI_API_KEY` to the root `.env`. Keep it server-only: never put it in `f
 REALTIME_MODEL=gpt-realtime-2.1-mini
 REALTIME_VOICE=marin
 SAFETY_IDENTIFIER_SALT=chalk-local-development-v1
-BOARD_MODEL=gpt-5.6-luna
-BOARD_REASONING_EFFORT=none
-BOARD_PROMPT_VERSION=v2
-ANNOTATION_GENERATION_TIMEOUT_SECONDS=15
+BOARD_MODEL=gpt-6.1-sol
+BOARD_REASONING_EFFORT=low
+BOARD_PROMPT_VERSION=v4
+LESSON_GENERATION_TIMEOUT_SECONDS=45
+ANNOTATION_GENERATION_TIMEOUT_SECONDS=25
 ANNOTATION_MAX_CONCURRENT=1
 SYNC_MODE=fixed
 DRAWBACK_MODE=vision
 FRONTEND_ORIGIN=http://localhost:5173
 ```
 
-`SAFETY_IDENTIFIER_SALT` is a non-secret domain-separation value, not an authentication credential. Choose a deliberate per-app value if this prototype is ever adapted beyond local development. `SYNC_MODE=fixed` is the dependable concurrent schedule: ink starts only on observed audio playback activity and advances on a bounded word-count clock. `paced` remains an experimental comparison because transcript generation can lead audible playout and must not be treated as playback position. `BOARD_MODEL` selects the M3 lesson generator, and `BOARD_REASONING_EFFORT=none` is the documented six-second latency baseline. `BOARD_PROMPT_VERSION=v3` enables the explicit spatial contract; `v2` preserves the accepted accumulated-whiteboard prompt and `v1` preserves the earlier retained-batch prompt. Prompt hashes always identify the selected version, and evidence from different versions must not be combined. `low` remains allowlisted only for a measured quality comparison. `DRAWBACK_MODE` remains forward configuration. Audition `cedar` against `marin` before recording. If Luna misses the unchanged rubric, compare only the failed topics on Terra before changing the default; Sol remains a last escalation. Any further live model evaluation requires explicit owner approval.
+`SAFETY_IDENTIFIER_SALT` is a non-secret domain-separation value, not an authentication credential. Choose a deliberate per-app value if this prototype is ever adapted beyond local development. `SYNC_MODE=fixed` is the dependable concurrent schedule: ink starts only on observed audio playback activity and advances on a bounded word-count clock. `paced` remains an experimental comparison because transcript generation can lead audible playout and must not be treated as playback position. `BOARD_MODEL` selects the lesson generator. The default is `gpt-6.1-sol` at `low` reasoning (selected 2026-10-18 for drawing quality; it rejects `none`, and first ink is slower than the six-second M3 baseline). `gpt-6-luna` with `none` is the fast, low-cost fallback; `gpt-5.6-luna` with `none` is the configuration the M3 evidence below was measured on. `BOARD_PROMPT_VERSION=v4` (the default since 2026-10-21) teaches the schema-1.5 `figure` op: one coordinate convention, frames, and marks that reference each other. `v3` keeps the explicit spatial contract and is the rollback; `v2` preserves the accepted accumulated-whiteboard prompt and `v1` preserves the earlier retained-batch prompt. Prompt hashes always identify the selected version, and evidence from different versions must not be combined. `low` remains allowlisted only for a measured quality comparison; `medium` (Sol and Astra only reason above `none`) is allowlisted for the 2026-10-21 low-vs-medium comparison, and the default stays `low`. `DRAWBACK_MODE` remains forward configuration. Audition `cedar` against `marin` before recording. If Luna misses the unchanged rubric, compare only the failed topics on Terra before changing the default; Sol remains a last escalation. Any further live model evaluation requires explicit owner approval.
 
 ## Run locally
 

@@ -81,27 +81,77 @@ def sample_curve(
         )
 
 
-def _evaluate(node: ast.expr, x: float) -> float:
-    result = _evaluate_node(node, x)
+def sample_values(
+    expression: str,
+    variable: str,
+    start: float,
+    end: float,
+    count: int,
+) -> list[tuple[float, float]]:
+    """Samples `(variable, value)` exactly as the browser's compiled sampler does."""
+
+    if not (math.isfinite(start) and math.isfinite(end)) or start >= end:
+        raise CurveSamplingError("sample range must be finite and increasing")
+    try:
+        tree = ast.parse(expression.replace("^", "**"), mode="eval")
+    except (SyntaxError, ValueError):
+        raise CurveSamplingError("expression syntax is outside the restricted grammar") from None
+    count = min(241, max(16, count))
+    samples: list[tuple[float, float]] = []
+    previous: float | None = None
+    for index in range(count):
+        value_in = start + ((end - start) * index) / (count - 1)
+        value = _evaluate(tree.body, value_in, variable)
+        if abs(value) > MAX_ABS_SAMPLE:
+            raise CurveSamplingError(
+                "expression output exceeds the rendering budget; restrict the range"
+            )
+        if previous is not None and abs(value - previous) > max(
+            DISCONTINUITY_ABSOLUTE, abs(previous) * DISCONTINUITY_RELATIVE
+        ):
+            raise CurveSamplingError("expression has a pathological sampled discontinuity")
+        samples.append((value_in, value))
+        previous = value
+    return samples
+
+
+def longest_visible_run(
+    points: list[tuple[float, float]],
+    window_x: tuple[float, float],
+    window_y: tuple[float, float],
+) -> int:
+    run = 0
+    longest = 0
+    for x, y in points:
+        if window_x[0] <= x <= window_x[1] and window_y[0] <= y <= window_y[1]:
+            run += 1
+            longest = max(longest, run)
+        else:
+            run = 0
+    return longest
+
+
+def _evaluate(node: ast.expr, x: float, variable: str = "x") -> float:
+    result = _evaluate_node(node, x, variable)
     if isinstance(result, complex) or not math.isfinite(result):
         raise CurveSamplingError("expression produced a non-finite sample; restrict the domain")
     return float(result)
 
 
-def _evaluate_node(node: ast.expr, x: float) -> float:
+def _evaluate_node(node: ast.expr, x: float, variable: str = "x") -> float:
     try:
         if isinstance(node, ast.Constant):
             return float(node.value)
         if isinstance(node, ast.Name):
-            if node.id == "x":
+            if node.id == variable:
                 return x
             return _NAMES[node.id]
         if isinstance(node, ast.UnaryOp):
-            operand = _evaluate_node(node.operand, x)
+            operand = _evaluate_node(node.operand, x, variable)
             return operand if isinstance(node.op, ast.UAdd) else -operand
         if isinstance(node, ast.BinOp):
-            left = _evaluate_node(node.left, x)
-            right = _evaluate_node(node.right, x)
+            left = _evaluate_node(node.left, x, variable)
+            right = _evaluate_node(node.right, x, variable)
             if isinstance(node.op, ast.Add):
                 return left + right
             if isinstance(node.op, ast.Sub):
@@ -119,7 +169,7 @@ def _evaluate_node(node: ast.expr, x: float) -> float:
                 )
             return result
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
-            return float(_FUNCTIONS[node.func.id](_evaluate_node(node.args[0], x)))
+            return float(_FUNCTIONS[node.func.id](_evaluate_node(node.args[0], x, variable)))
     except CurveSamplingError:
         raise
     except (ZeroDivisionError, OverflowError, ValueError, KeyError, TypeError):

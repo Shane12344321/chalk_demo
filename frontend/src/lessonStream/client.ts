@@ -419,7 +419,7 @@ class LessonStreamAssembler {
       browserDroppedSteps: this.browserDroppedSteps,
       sanitizedSteps: this.sanitizedSteps,
       sanitizedFields: this.sanitizedFields,
-      lesson: { schemaVersion: "1.4", title: this.title, steps: this.steps },
+      lesson: { schemaVersion: "1.5", title: this.title, steps: this.steps },
       repairs: this.terminal?.repairs ?? this.serverRepairAttempts,
       droppedSteps: this.terminal?.dropped_steps ?? 0,
       partial: this.serverErrorCode !== undefined,
