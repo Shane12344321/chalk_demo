@@ -1,0 +1,17 @@
+HTTP/1.1 200 OK
+date: Sat, 31 Oct 2026 15:51:51 GMT
+server: uvicorn
+cache-control: no-store
+x-content-type-options: nosniff
+x-chalk-board-model: gpt-6.1-sol
+x-chalk-board-reasoning-effort: low
+x-chalk-board-prompt-sha256: 6cbab0b0f2e6d13e2085d777eea48e312fd5469a5bac6f939582991cbfee06f7
+x-chalk-repair-prompt-sha256: dd63100516176462056989c9b013eab4f3fb633c71df06fc5e8eeed12b1fda39
+x-chalk-continuation-prompt-sha256: e5eb2f6a9ed13114b31cb8df0ae18f174aab6b282d7985d67e458e8773338f9b
+x-chalk-configuration-sha256: c869650ea9b551b28509a25e31b4dda4c54e1a98dfc56a256118bee5917ec86e
+content-type: application/x-ndjson
+access-control-expose-headers: X-Chalk-Board-Model, X-Chalk-Board-Reasoning-Effort, X-Chalk-Board-Prompt-SHA256, X-Chalk-Repair-Prompt-SHA256, X-Chalk-Continuation-Prompt-SHA256, X-Chalk-Configuration-SHA256, X-Chalk-Annotation-Repairs, X-Chalk-Annotation-Prompt-SHA256, X-Chalk-Annotation-Whitespace
+access-control-allow-origin: http://localhost:5173
+vary: Origin
+transfer-encoding: chunked
+

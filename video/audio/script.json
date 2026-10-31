@@ -1,0 +1,135 @@
+{
+  "voices": {
+    "narrator": {
+      "name": "Chris",
+      "fallback": "iP95p4xoKVk53GoZ742B",
+      "stability": 0.5,
+      "similarity_boost": 0.8,
+      "style": 0.0
+    },
+    "tutor": {
+      "name": "Jessica",
+      "fallback": "cgSgspJ2msm6clMCkdW9",
+      "stability": 0.5,
+      "similarity_boost": 0.8,
+      "style": 0.0
+    },
+    "student": {
+      "name": "Will",
+      "fallback": "bIHbv24MWmeRgasZH58o",
+      "stability": 0.5,
+      "similarity_boost": 0.75,
+      "style": 0.0
+    }
+  },
+  "lines": [
+    {
+      "id": "n_open",
+      "role": "narrator",
+      "text": "[thoughtful] The best teachers don't just talk. They draw... and they stop the second you're lost."
+    },
+    {
+      "id": "n_meet",
+      "role": "narrator",
+      "text": "[warmly] Meet CHALK. A voice tutor that teaches on a live whiteboard."
+    },
+    {
+      "id": "n_ask",
+      "role": "narrator",
+      "text": "Just ask for any math or physics topic, and it plans the whole lesson, live."
+    },
+    {
+      "id": "t_s1",
+      "role": "tutor",
+      "text": "[warmly] Okay! Same speed, level ground, no air drag. Forty-five degrees sends it the farthest. Let's see why."
+    },
+    {
+      "id": "t_s2",
+      "role": "tutor",
+      "text": "So, a shallow launch moves fast sideways... but it lands quickly. A steep one stays up longer, but drifts slowly."
+    },
+    {
+      "id": "t_s3",
+      "role": "tutor",
+      "text": "Range is just sideways speed times flight time. Multiply them, and you get sine of twice the angle."
+    },
+    {
+      "id": "t_s4a",
+      "role": "tutor",
+      "text": "Now, sine can never go above one, so twice the angle has to\u2014"
+    },
+    {
+      "id": "s_wait",
+      "role": "student",
+      "text": "[hesitant] Wait, sorry... where did sine of two theta come from?"
+    },
+    {
+      "id": "t_answer",
+      "role": "tutor",
+      "text": "[warmly] Oh, good question! Look at the range equation. Two sine theta cosine theta... that's the double-angle identity. It's exactly sine of two theta."
+    },
+    {
+      "id": "s_ok",
+      "role": "student",
+      "text": "[relieved] Ohh, got it. Keep going."
+    },
+    {
+      "id": "t_s4b",
+      "role": "tutor",
+      "text": "So twice the angle is ninety degrees... which makes the launch angle forty-five."
+    },
+    {
+      "id": "n_any",
+      "role": "narrator",
+      "text": "Any topic. Every diagram is generated on the spot, and grounded in what's actually on the board."
+    },
+    {
+      "id": "n_how",
+      "role": "narrator",
+      "text": "Under the hood, a realtime voice model talks and listens. A planner writes the lesson. And a custom drawer orchestrates every stroke, so voice and ink stay in sync."
+    },
+    {
+      "id": "n_end",
+      "role": "narrator",
+      "text": "CHALK. The tutor that draws while it talks... and listens when you need it."
+    }
+  ],
+  "sfx": [
+    {
+      "id": "sfx_chalk",
+      "text": "chalk writing quickly on a slate blackboard, close-up, crisp scratching strokes",
+      "seconds": 4.0
+    },
+    {
+      "id": "sfx_whoosh",
+      "text": "soft airy cinematic whoosh transition, clean",
+      "seconds": 1.2
+    },
+    {
+      "id": "sfx_hit",
+      "text": "deep warm cinematic impact boom with a soft shimmer tail",
+      "seconds": 3.0
+    },
+    {
+      "id": "sfx_click",
+      "text": "single soft modern UI mouse click",
+      "seconds": 0.5
+    },
+    {
+      "id": "sfx_freeze",
+      "text": "short glassy freeze stop sound effect, time stopping, subtle",
+      "seconds": 1.0
+    },
+    {
+      "id": "sfx_type",
+      "text": "fast quiet laptop keyboard typing, a short sentence",
+      "seconds": 3.0
+    }
+  ],
+  "music": {
+    "id": "music_bed",
+    "prompt": "Inspiring modern cinematic electronic underscore for a tech product demo. 104 BPM. Opens with a soft felt piano motif and airy pads, builds with warm plucked synth arpeggios and a light, tight hip-hop influenced drum groove, gentle sub bass. Optimistic, curious, intelligent, premium. Instrumental only, no vocals. Leaves space for voiceover. Ends with a confident resolved final chord.",
+    "seconds": 88
+  },
+  "model": "eleven_v3"
+}

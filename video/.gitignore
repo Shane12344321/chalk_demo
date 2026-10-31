@@ -1,0 +1,7 @@
+*.blend1
+assets/raw/
+capture/runs/
+node_modules
+node_modules/
+out/
+remotion/public/
